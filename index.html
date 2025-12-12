@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Test Server</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        margin-top: 100px;
+      }
+      .status {
+        font-size: 1.2em;
+        color: #333;
+      }
+      button {
+        padding: 10px 20px;
+        font-size: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Node.js Server Test</h1>
+    <button id="checkBtn">Check Server Status</button>
+    <p class="status" id="statusMsg">Click the button to check status.</p>
+
+    <script>
+      document
+        .getElementById("checkBtn")
+        .addEventListener("click", async () => {
+          try {
+            const response = await fetch("/status");
+            const data = await response.json();
+            document.getElementById("statusMsg").textContent = data.status;
+          } catch (err) {
+            document.getElementById("statusMsg").textContent =
+              "Error contacting server.";
+          }
+        });
+    </script>
+  </body>
+</html>

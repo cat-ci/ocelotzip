@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>File Manager</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 900px;
+        margin: 40px auto;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      #storage {
+        font-size: 0.9em;
+        color: #666;
+      }
+      #breadcrumb a {
+        text-decoration: none;
+        color: #0077cc;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1em;
+      }
+      th,
+      td {
+        border-bottom: 1px solid #ccc;
+        padding: 6px 10px;
+        text-align: left;
+      }
+      tr:hover {
+        background: #f6f6f6;
+      }
+      #uploadBtn,
+      #newFolderBtn {
+        background: #0066ee;
+        color: white;
+        padding: 6px 12px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-right: 4px;
+      }
+      #logout {
+        text-decoration: none;
+        color: crimson;
+      }
+      input[type="file"] {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h2 id="username">File Manager</h2>
+      <div>
+        <label for="fileInput" id="uploadBtn">Upload</label>
+        <input id="fileInput" type="file" />
+        <button id="newFolderBtn">+ Folder</button>
+        <a id="logout" href="/logout">Logout</a>
+      </div>
+    </header>
+    <div id="storage"></div>
+    <div id="breadcrumb"></div>
+
+    <table id="fileTable">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Size</th>
+          <th>Modified</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <script>
+      let currentPath = "";
+
+      function bytesToMB(b) {
+        return (b / 1e6).toFixed(2) + " MB";
+      }
+
+      async function fetchFiles() {
+        const res = await fetch("/api/files?path=" + encodeURIComponent(currentPath));
+        if (!res.ok) {
+          document.body.innerHTML = "<p>Session expired. <a href='/'>Login again</a>.</p>";
+          return;
+        }
+        const data = await res.json();
+        const tbody = document.querySelector("#fileTable tbody");
+        tbody.innerHTML = "";
+        document.querySelector("#username").textContent = `${data.username}'s Files`;
+
+        const percent = ((data.usedBytes / data.maxBytes) * 100).toFixed(1);
+        document.querySelector(
+          "#storage"
+        ).textContent = `Used ${bytesToMB(data.usedBytes)} / ${bytesToMB(
+          data.maxBytes
+        )} (${percent}%)`;
+        const bc = ["<a href='#' data-path=''>Home</a>"];
+        const parts = currentPath.split("/").filter(Boolean);
+        let walk = "";
+        for (const p of parts) {
+          walk += (walk ? "/" : "") + p;
+          bc.push(`<a href='#' data-path='${walk}'>${p}</a>`);
+        }
+        document.querySelector("#breadcrumb").innerHTML = bc.join(" / ");
+
+        if (data.items.length === 0) {
+          tbody.innerHTML = "<tr><td colspan='3'>(empty)</td></tr>";
+        } else {
+          for (const item of data.items) {
+            const tr = document.createElement("tr");
+            const date = new Date(item.mtime).toLocaleString();
+            if (item.isDir) {
+              tr.innerHTML = `<td><a href='#' data-dir='${item.path}'>📁 ${
+                item.name
+              }</a></td><td>-</td><td>${date}</td>`;
+            } else {
+              tr.innerHTML = `<td><a href='${item.url}' target='_blank'>${item.name}</a></td><td>${bytesToMB(
+                item.size
+              )}</td><td>${date}</td>`;
+            }
+            tbody.appendChild(tr);
+          }
+        }
+      }
+
+      document.getElementById("breadcrumb").addEventListener("click", (e) => {
+        if (e.target.dataset.path !== undefined) {
+          e.preventDefault();
+          currentPath = e.target.dataset.path;
+          fetchFiles();
+        }
+      });
+
+      document.querySelector("#fileTable").addEventListener("click", (e) => {
+        if (e.target.dataset.dir !== undefined) {
+          e.preventDefault();
+          currentPath = e.target.dataset.dir;
+          fetchFiles();
+        }
+      });
+
+      document.querySelector("#fileInput").addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const form = new FormData();
+        form.append("file", file);
+        const res = await fetch("/api/upload?path=" + encodeURIComponent(currentPath), {
+          method: "POST",
+          body: form,
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          alert(err.error);
+        }
+        e.target.value = "";
+        fetchFiles();
+      });
+
+      document.getElementById("newFolderBtn").addEventListener("click", async () => {
+        const name = prompt("Folder name:");
+        if (!name) return;
+        await fetch("/api/folder", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ path: currentPath, name }),
+        });
+        fetchFiles();
+      });
+
+      fetchFiles();
+    </script>
+  </body>
+</html>
