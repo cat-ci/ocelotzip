@@ -279,6 +279,70 @@
             text-decoration: underline;
         }
 
+        .header-nav {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            gap: 12px;
+        }
+
+        .header-nav a {
+            padding: 8px 16px;
+            border: 1px solid var(--yellow);
+            border-radius: 4px;
+            transition: 0.2s;
+            font-family: 'Jetbrains Mono', monospace;
+            font-size: 14px;
+        }
+
+        .header-nav a:hover {
+            background: var(--yellow);
+            color: var(--black);
+            text-decoration: none;
+        }
+
+        .header-nav a.btn-primary {
+            background: var(--yellow);
+            color: var(--black);
+            border-color: var(--yellow);
+            font-weight: bold;
+        }
+
+        .header-nav a.btn-primary:hover {
+            background: var(--yellow-dark);
+        }
+
+        .header-nav {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            gap: 12px;
+        }
+
+        .header-nav a {
+            padding: 8px 16px;
+            border: 1px solid var(--yellow);
+            border-radius: 4px;
+            transition: 0.2s;
+        }
+
+        .header-nav a:hover {
+            background: var(--yellow);
+            color: var(--black);
+            text-decoration: none;
+        }
+
+        .header-nav a.btn-primary {
+            background: var(--yellow);
+            color: var(--black);
+            border-color: var(--yellow);
+            font-weight: bold;
+        }
+
         footer p {
             margin: 8px 24px 24px 24px;
             font-size: 14px;
@@ -343,6 +407,11 @@
 </head>
 
 <body>
+    <div class="header-nav">
+        <a href="/login">Sign In</a>
+        <a href="/signup" class="btn-primary">Sign Up</a>
+    </div>
+
     <div class="hero">
         <img src="ocelotzip.png" class="ocelot">
         <div class="hero-1">

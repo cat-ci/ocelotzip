@@ -248,11 +248,23 @@ const upload = multer({ storage });
 
 app.get("/", (req, res) => {
   if (!req.session.user)
-    return res.send(`<h1>FileHost API</h1><a href="/login">Login with Catci</a>`);
+    return res.sendFile(path.join(process.cwd(), "public", "home.html"));
   res.sendFile(path.join(process.cwd(), "public", "filemanager.html"));
 });
 
 app.get("/login", (req, res) => {
+  const state = crypto.randomBytes(8).toString("hex");
+  const verifier = crypto.randomBytes(32).toString("hex");
+  const challenge = crypto.createHash("sha256").update(verifier).digest("base64url");
+  req.session.state = state;
+  req.session.verifier = verifier;
+  const url = `${CATCI_BASE}/oauth/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(
+    REDIRECT_URI
+  )}&response_type=code&state=${state}&code_challenge=${challenge}`;
+  res.redirect(url);
+});
+
+app.get("/signup", (req, res) => {
   const state = crypto.randomBytes(8).toString("hex");
   const verifier = crypto.randomBytes(32).toString("hex");
   const challenge = crypto.createHash("sha256").update(verifier).digest("base64url");
