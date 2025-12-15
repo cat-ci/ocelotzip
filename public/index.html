@@ -3,50 +3,142 @@
 
 <head>
     <style>
-        :root{
-            --yellow:#fadc79;
-            --black:#1d1c15;
-            --white:#f0ede2;
+        :root {
+            --yellow: #fadc79;
+            --yellow-dark: #caa927;
+            --black: #1d1c15;
+            --white: #f0ede2;
+
         }
+
         @font-face {
             font-family: 'pixel';
             src: url('pixel.ttf') format('truetype');
         }
-        h1{
+
+        @font-face {
+            font-family: 'jetbrains mono';
+            src: url('JetbrainsMono.ttf') format('truetype');
+        }
+
+        h1 {
             font-family: 'pixel', sans-serif;
             font-size: 72px;
         }
-        body{
+
+        body {
             color: var(--white);
             background-color: #1d1c15;
             margin: 0;
             padding: 0;
+            font-family: 'Jetbrains Mono', monospace;
         }
-        footer{
+
+        footer {
             width: 100%;
             height: 160px;
             background-color: var(--yellow);
             color: var(--black);
         }
-        .hero{
-            position: relative;
 
+        .hero {
+            position: relative;
         }
-        #catci-logo{
+
+        .logo {
+            position: relative;
+        }
+        .text-logo {
+            position: relative;
+        }
+
+        #catci-logo {
             width: 150px;
         }
-        #ocelot-logo{
+
+        #ocelot-logo {
             width: 400px;
             position: absolute;
-            top:360px;
-            left:250px;
+            top: 360px;
+            left: 250px;
         }
-        .ocelot{
+
+        .ocelot {
             height: 600px;
             width: 485px;
             padding: 0;
             margin: 0;
             image-rendering: pixelated;
+        }
+
+        h1 {
+            margin: 0;
+            padding: 0;
+            position: relative;
+            height: 130px;
+        }
+
+        h1 span:first-child {
+            color: var(--yellow);
+        }
+
+        h1 span:first-child::before {
+            content: 'Ocelot';
+            position: absolute;
+            z-index: -2;
+            -webkit-text-stroke: var(--yellow-dark) 22px;
+        }
+
+        h1 span:last-child {
+            color: var(--yellow);
+            position: absolute;
+            left: 0px;
+            top: 50px;
+            z-index: 2;
+        }
+
+        h1 span:last-child::before {
+            content: '.zip';
+            position: absolute;
+            z-index: -1;
+            -webkit-text-stroke: var(--yellow-dark) 22px;
+        }
+
+        h2 {
+            font-size: 32px;
+        }
+
+        h2 span:first-child {
+            color: var(--yellow);
+        }
+
+        h2 span:last-child {
+            color: var(--yellow-dark);
+        }
+
+        .oneko {
+            width: 180px;
+            height: 180px;
+            background-image: url('oneko.gif');
+            image-rendering: pixelated;
+            background-size: 1500px;
+            background-position: -380px -0px;
+            animation: oneko 1s steps(2) infinite;
+            transform: scale(0.6);
+            position: absolute;
+            left: 80px;
+            top: 10px;
+            z-index: 2;
+        }
+
+        @keyframes oneko {
+            0% {
+                background-position: -380px -0px;
+            }
+
+            100% {
+                background-position: -380px -375px;
+            }
         }
     </style>
 </head>
@@ -55,13 +147,15 @@
     <div class="hero">
         <div class="logo">
             <img src="ocelotzip.png" class="ocelot">
-            <h1><span>Ocelot</span><span>.zip</span></h1>
+            <div class="text-logo">
+                <h1><span>Ocelot</span><span>.zip</span></h1>
+                <div class="oneko"></div>
+            </div>
         </div>
         <h2>Make your media <span>responsive</span> and <span>fast</span></h2>
-        <a href=""
+        <a href="/signup"><button>Get Started</button></a>
     </div>
-    <img src="oneko.gif">
-    <p>Welcome to Ocelot.zip, the purr-fect place to manage your files with a feline touch! Our cat-themed file manager combines functionality with fun, making file organization a delightful experience. Whether you're uploading, renaming, or creating new folders, Ocelot.zip ensures your files are always just a whisker away. Get started now and let your files prowl in style!</p>
+    <div class="why"></div>
     <footer>
         <a href="https://catci.net">
             <img src="catci-logo.png" id="catci-logo">
