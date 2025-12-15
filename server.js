@@ -17,7 +17,7 @@ const CATCI_BASE = "http://localhost:4000";
 const CLIENT_ID = "filehost-app";   
 const CLIENT_SECRET = "super-secret-catci-key";
 const REDIRECT_URI = `http://localhost:${PORT}/auth/callback`;
-const MAX_STORAGE_BYTES = 1024 * 1024 * 1024;
+const MAX_STORAGE_BYTES = 10 * 1024 * 1024 * 1024;
 
 const baseUploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(baseUploadDir)) fs.mkdirSync(baseUploadDir);

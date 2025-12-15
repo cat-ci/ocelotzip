@@ -485,11 +485,115 @@
     <hr>
     <div class="how">
         <h2>How It Works</h2>
-        <p></p>
+        <p style="margin-bottom: 20px; opacity: 0.9;">Getting started with Ocelot.zip is simple. Here's how to use it:</p>
+        
+        <h3 style="color: var(--yellow); margin-top: 28px; font-size: 22px;">Quick Start</h3>
+        <p style="margin-bottom: 18px; opacity: 0.9;">
+            1. <a href="/signup">Sign up</a> or <a href="/login">log in</a> with your account<br>
+            2. Upload your media files through the web UI or API<br>
+            3. Access your files via short slug URLs, pretty names, or direct paths<br>
+            4. Add query parameters to transform on-the-fly
+        </p>
+
+        <h3 style="color: var(--yellow); margin-top: 28px; font-size: 22px;">File Access URLs</h3>
+        <p style="opacity: 0.9; margin-bottom: 12px;">Three ways to access your files:</p>
+        <ul style="opacity: 0.9; line-height: 1.8; margin-left: 20px;">
+            <li><strong>Slug:</strong> <code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">/files/&lt;username&gt;/&lt;6-char-slug&gt;</code></li>
+            <li><strong>Pretty name:</strong> <code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">/files/&lt;username&gt;/&lt;original-name&gt;</code></li>
+            <li><strong>Direct path:</strong> <code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">/files/&lt;username&gt;/&lt;folder&gt;/&lt;timestamp-filename&gt;</code></li>
+        </ul>
+
+        <h3 style="color: var(--yellow); margin-top: 28px; font-size: 22px;">Transform Parameters</h3>
+        <p style="opacity: 0.9; margin-bottom: 12px;">Add query parameters to your file URLs for on-the-fly processing:</p>
+        <ul style="opacity: 0.9; line-height: 1.8; margin-left: 20px;">
+            <li><strong>Images:</strong> <code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">?w=800&h=600&f=webp&q=80&s=cover</code></li>
+            <li><strong>Audio:</strong> <code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">?f=mp3&q=192</code></li>
+            <li><strong>Video:</strong> <code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">?w=1280&h=720&f=mp4</code></li>
+        </ul>
+
+        <h3 style="color: var(--yellow); margin-top: 28px; font-size: 22px;">API Endpoints</h3>
+        <p style="opacity: 0.9; margin-bottom: 12px;">Use these endpoints for programmatic access (authentication required):</p>
+        <ul style="opacity: 0.9; line-height: 1.8; margin-left: 20px;">
+            <li><code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">GET /api/files?path=&lt;path&gt;</code> - List files and folders</li>
+            <li><code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">POST /api/upload?path=&lt;path&gt;</code> - Upload a file (multipart form)</li>
+            <li><code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">POST /api/folder</code> - Create a new folder</li>
+            <li><code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">POST /api/rename</code> - Rename files or folders</li>
+            <li><code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">POST /api/delete</code> - Delete files or folders</li>
+            <li><code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">POST /api/package</code> - Create ZIP with transformations</li>
+            <li><code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">GET /api/apikey</code> - Get your API key</li>
+        </ul>
+
+        <h3 style="color: var(--yellow); margin-top: 28px; font-size: 22px;">Features</h3>
+        <ul style="opacity: 0.9; line-height: 1.8; margin-left: 20px;">
+            <li>Per-user storage with automatic organization</li>
+            <li>Short 6-character alphanumeric slugs for easy sharing</li>
+            <li>On-demand image, audio, and video processing with automatic caching</li>
+            <li>Web UI file manager for easy browsing and management</li>
+            <li>Package API to create ZIP archives with optional transformations</li>
+            <li>Supports nested folders and subfolders</li>
+        </ul>
     </div>
     <hr>
-    <div class="faq">
-        <h2>Frequently Asked Questions</h2>
+    <div class="faq" style="padding: 36px 20px; width: 80%; max-width: 1100px; margin: 0 auto 40px auto; color: var(--white); text-align: left;">
+        <h2 style="margin-bottom: 24px;">Frequently Asked Questions</h2>
+        
+        <div style="margin-bottom: 28px;">
+            <h3 style="color: var(--yellow); font-size: 20px; margin-bottom: 8px;">What file types are supported?</h3>
+            <p style="opacity: 0.9; line-height: 1.6;">
+                Ocelot.zip supports all common image formats (PNG, JPG, WEBP, AVIF, GIF, etc.), audio formats (MP3, OGG, OPUS, WAV, FLAC, etc.), 
+                and video formats (MP4, WEBM, MOV, MKV, etc.). You can convert between any supported formats on-the-fly using query parameters.
+            </p>
+        </div>
+
+        <div style="margin-bottom: 28px;">
+            <h3 style="color: var(--yellow); font-size: 20px; margin-bottom: 8px;">How do I authenticate API requests?</h3>
+            <p style="opacity: 0.9; line-height: 1.6;">
+                You can authenticate in two ways: (1) Session-based authentication via the web UI after logging in, or (2) Bearer token authentication 
+                using your API key. Get your API key from <code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">GET /api/apikey</code> 
+                and include it as <code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">Authorization: Bearer &lt;your-api-key&gt;</code> in request headers.
+            </p>
+        </div>
+
+        <div style="margin-bottom: 28px;">
+            <h3 style="color: var(--yellow); font-size: 20px; margin-bottom: 8px;">Are processed files cached?</h3>
+            <p style="opacity: 0.9; line-height: 1.6;">
+                Yes! All processed files are cached in the <code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">temp/</code> 
+                directory for faster subsequent requests. Cached files older than 28 days are automatically cleaned up to save space.
+            </p>
+        </div>
+
+        <div style="margin-bottom: 28px;">
+            <h3 style="color: var(--yellow); font-size: 20px; margin-bottom: 8px;">Can I organize files into folders?</h3>
+            <p style="opacity: 0.9; line-height: 1.6;">
+                Absolutely! Use the web UI or the <code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">POST /api/folder</code> 
+                endpoint to create folders. Upload files to specific folders using the <code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">?path=</code> 
+                parameter. Slug URLs work seamlessly with nested files.
+            </p>
+        </div>
+
+        <div style="margin-bottom: 28px;">
+            <h3 style="color: var(--yellow); font-size: 20px; margin-bottom: 8px;">What's the storage limit?</h3>
+            <p style="opacity: 0.9; line-height: 1.6;">
+                Each user gets 1 GB of storage by default. This is configurable in <code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">server.js</code> 
+                via the <code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">MAX_STORAGE_BYTES</code> constant.
+            </p>
+        </div>
+
+        <div style="margin-bottom: 28px;">
+            <h3 style="color: var(--yellow); font-size: 20px; margin-bottom: 8px;">How do I create a ZIP package?</h3>
+            <p style="opacity: 0.9; line-height: 1.6;">
+                Use the <code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">POST /api/package</code> endpoint with a JSON body like 
+                <code style="background: rgba(250,220,121,0.1); padding: 2px 6px; border-radius: 3px;">{"username": "yourname", "files": [{"path": "folder/file.jpg", "w": 800, "f": "webp"}]}</code>. 
+                Each file can have optional transformation parameters applied before being added to the ZIP.
+            </p>
+        </div>
+
+        <div style="margin-bottom: 28px;">
+            <h3 style="color: var(--yellow); font-size: 20px; margin-bottom: 8px;">Is this open source?</h3>
+            <p style="opacity: 0.9; line-height: 1.6;">
+                Yes! Ocelot.zip is open source. You can self-host it, modify it, and contribute improvements. Check the repository for more details and documentation.
+            </p>
+        </div>
     </div>
     <footer>
         <a href="https://catci.net">
