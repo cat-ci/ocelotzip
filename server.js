@@ -163,14 +163,40 @@ function resolveFileBySlugOrName(username, nameOrSlug) {
   }
   
   // Try as pretty name (original filename)
-  // Look for any file that ends with this name or contains it
+  // If the input contains a path (subfolders), try resolving that directly
   try {
-    const files = fs.readdirSync(userDir);
-    for (const file of files) {
-      if (file.endsWith('-' + nameOrSlug) || file === nameOrSlug) {
-        return file;
+    const normalized = path.normalize(nameOrSlug);
+    if (normalized.includes(path.sep) || normalized.includes('/')) {
+      try {
+        const full = resolveUserPath(username, normalized);
+        if (fs.existsSync(full)) return normalized;
+      } catch (e) {
+        // fall through to recursive search
       }
     }
+
+    // Recursively search user directory for a matching file.
+    // Match exact relative path, basename, or timestamp-style names that end with '-<originalname>'.
+    function searchDir(dir) {
+      const entries = fs.readdirSync(dir);
+      for (const f of entries) {
+        const full = path.join(dir, f);
+        const stat = fs.statSync(full);
+        if (stat.isDirectory()) {
+          const found = searchDir(full);
+          if (found) return found;
+        } else {
+          const rel = path.relative(userDir, full);
+          if (rel === nameOrSlug || path.basename(rel) === nameOrSlug || rel.endsWith('-' + nameOrSlug)) {
+            return rel;
+          }
+        }
+      }
+      return null;
+    }
+
+    const found = searchDir(userDir);
+    if (found) return found;
   } catch (err) {
     // Directory doesn't exist or other error
   }
@@ -326,9 +352,15 @@ app.get("/api/files", authenticate, (req, res) => {
       let originalName = path.parse(name).name; // default: filename without extension
       
       if (!stat.isDirectory()) {
-        // Look for existing slug
+        // Look for existing slug (match relative path or basename)
         for (const [s, mapping] of Object.entries(slugMap)) {
-          if (mapping.timestamp === name) {
+          const mapped = mapping.timestamp;
+          if (
+            mapped === rel ||
+            path.basename(mapped) === name ||
+            mapped.endsWith(path.sep + name) ||
+            mapped.endsWith('/' + name)
+          ) {
             slug = s;
             originalName = mapping.original;
             break;
@@ -343,9 +375,10 @@ app.get("/api/files", authenticate, (req, res) => {
           const match = name.match(/^\d+-(.+)$/);
           const extracted = match ? match[1] : originalName;
           const nameOnly = path.parse(extracted).name;
-          
+          // Use the relative path so slugs work for files in subfolders
+          const relPath = rel;
           slugMap[slug] = {
-            timestamp: name,
+            timestamp: relPath,
             original: nameOnly,
             created: new Date().toISOString()
           };
@@ -469,9 +502,12 @@ app.post("/api/upload", authenticate, upload.single("file"), (req, res) => {
     const slug = generateSlug();
     const slugMap = getSlugMap(username);
     const originalName = path.parse(req.file.originalname).name;
-    
+    // Store relative path (includes any upload subfolder) so slugs work for nested files
+    const sub = req.query.path || "";
+    const relPath = path.join(sub, req.file.filename);
+
     slugMap[slug] = {
-      timestamp: req.file.filename,
+      timestamp: relPath,
       original: originalName,
       created: new Date().toISOString()
     };
@@ -480,7 +516,7 @@ app.post("/api/upload", authenticate, upload.single("file"), (req, res) => {
     res.json({ 
       success: true,
       slug,
-      timestamp: req.file.filename,
+      timestamp: relPath,
       original: originalName
     });
   } catch (e) {

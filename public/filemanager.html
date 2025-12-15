@@ -193,7 +193,7 @@
                 item.name
               }</a></td><td>-</td><td>${date}</td><td><button class='renameBtn' data-path='${item.path}' data-name='${item.name}'>Rename</button><button class='deleteBtn' data-path='${item.path}'>Delete</button></td>`;
             } else {
-              const timestamp = item.name;
+              const timestamp = item.path;
               const original = item.originalName;
               const slug = item.slug;
               const username = data.username;
@@ -204,7 +204,7 @@
                   <div class="urlsContainer">
                     <div class="urlRow"><span class="urlLabel">Short:</span>/files/${username}/${slug}</div>
                     <div class="urlRow"><span class="urlLabel">Pretty:</span>/files/${username}/${original}</div>
-                    <div class="urlRow"><span class="urlLabel">Timestamp:</span>/files/${username}/${timestamp}</div>
+                    <div class="urlRow"><span class="urlLabel">Timestamp:</span>/files/${username}/${timestamp.split('/').map(encodeURIComponent).join('/')}</div>
                   </div>
                 `;
               } else {
