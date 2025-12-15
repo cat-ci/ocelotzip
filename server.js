@@ -10,7 +10,7 @@ const app = express();
 const PORT = 3000;
 
 const CATCI_BASE = "http://localhost:4000";
-const CLIENT_ID = "filehost-app";
+const CLIENT_ID = "filehost-app";   
 const CLIENT_SECRET = "super-secret-catci-key";
 const REDIRECT_URI = `http://localhost:${PORT}/auth/callback`;
 const MAX_STORAGE_BYTES = 1024 * 1024 * 1024;
@@ -237,6 +237,24 @@ app.post("/api/move", authenticate, (req, res) => {
     const src = resolveUserPath(username, from);
     const dest = resolveUserPath(username, to);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.renameSync(src, dest);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post("/api/rename", authenticate, (req, res) => {
+  const username = req.authUser;
+  const { path: filePath, newName } = req.body;
+  if (!filePath || !newName) return res.status(400).json({ error: "Missing fields" });
+  try {
+    const src = resolveUserPath(username, filePath);
+    const dir = path.dirname(src);
+    const dest = path.join(dir, safeName(newName));
+    if (fs.existsSync(dest)) {
+      return res.status(400).json({ error: "File with that name already exists" });
+    }
     fs.renameSync(src, dest);
     res.json({ success: true });
   } catch (err) {

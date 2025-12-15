@@ -53,6 +53,18 @@
       input[type="file"] {
         display: none;
       }
+      .renameBtn {
+        background: #28a745;
+        color: white;
+        padding: 4px 8px;
+        border: none;
+        border-radius: 3px;
+        cursor: pointer;
+        font-size: 0.85em;
+      }
+      .renameBtn:hover {
+        background: #218838;
+      }
     </style>
   </head>
   <body>
@@ -74,6 +86,7 @@
           <th>Name</th>
           <th>Size</th>
           <th>Modified</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -113,7 +126,7 @@
         document.querySelector("#breadcrumb").innerHTML = bc.join(" / ");
 
         if (data.items.length === 0) {
-          tbody.innerHTML = "<tr><td colspan='3'>(empty)</td></tr>";
+          tbody.innerHTML = "<tr><td colspan='4'>(empty)</td></tr>";
         } else {
           for (const item of data.items) {
             const tr = document.createElement("tr");
@@ -121,11 +134,11 @@
             if (item.isDir) {
               tr.innerHTML = `<td><a href='#' data-dir='${item.path}'>📁 ${
                 item.name
-              }</a></td><td>-</td><td>${date}</td>`;
+              }</a></td><td>-</td><td>${date}</td><td><button class='renameBtn' data-path='${item.path}' data-name='${item.name}'>Rename</button></td>`;
             } else {
               tr.innerHTML = `<td><a href='${item.url}' target='_blank'>${item.name}</a></td><td>${bytesToMB(
                 item.size
-              )}</td><td>${date}</td>`;
+              )}</td><td>${date}</td><td><button class='renameBtn' data-path='${item.path}' data-name='${item.name}'>Rename</button></td>`;
             }
             tbody.appendChild(tr);
           }
@@ -174,6 +187,25 @@
           body: JSON.stringify({ path: currentPath, name }),
         });
         fetchFiles();
+      });
+
+      document.querySelector("#fileTable").addEventListener("click", async (e) => {
+        if (e.target.classList.contains("renameBtn")) {
+          const filePath = e.target.dataset.path;
+          const oldName = e.target.dataset.name;
+          const newName = prompt("New name:", oldName);
+          if (!newName || newName === oldName) return;
+          const res = await fetch("/api/rename", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: filePath, newName }),
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            alert(err.error);
+          }
+          fetchFiles();
+        }
       });
 
       fetchFiles();
