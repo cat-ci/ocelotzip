@@ -4,66 +4,90 @@
     <meta charset="UTF-8" />
     <title>File Manager</title>
     <style>
-      body {
-        font-family: Arial, sans-serif;
-        max-width: 900px;
-        margin: 40px auto;
+      :root {
+        --yellow: #fadc79;
+        --yellow-dark: #e9be11;
+        --black: #1d1c15;
+        --deep-black: #12110a;
+        --white: #f0ede2;
       }
+
+      body {
+        font-family: 'Jetbrains Mono', monospace, Arial, sans-serif;
+        max-width: 1000px;
+        margin: 28px auto;
+        padding: 20px;
+        color: var(--white);
+        background-image: repeating-conic-gradient(var(--black) 0% 25%, var(--deep-black) 0% 50%);
+        background-size: 8px 8px;
+        box-sizing: border-box;
+      }
+
       header {
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 12px;
       }
-      #storage {
-        font-size: 0.9em;
-        color: #666;
-      }
-      #breadcrumb a {
-        text-decoration: none;
-        color: #0077cc;
-      }
+
+      h2#username { color: var(--yellow); margin: 0; }
+
+      #storage { font-size: 0.9em; color: rgba(240,237,226,0.8); }
+
+      #breadcrumb a { text-decoration: none; color: var(--yellow-dark); }
+
       table {
         width: 100%;
         border-collapse: collapse;
         margin-top: 1em;
+        background: transparent;
       }
-      th,
-      td {
-        border-bottom: 1px solid #ccc;
-        padding: 6px 10px;
+
+      th, td {
+        border-bottom: 1px solid rgba(255,255,255,0.04);
+        padding: 10px 12px;
         text-align: left;
       }
-      tr:hover {
-        background: #f6f6f6;
-      }
-      #uploadBtn,
-      #newFolderBtn {
-        background: #0066ee;
-        color: white;
-        padding: 6px 12px;
+
+      th { color: var(--yellow); font-weight: 700; }
+
+      tr:hover { background: linear-gradient(90deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); }
+
+      #uploadBtn, #newFolderBtn {
+        background: var(--yellow);
+        color: var(--black);
+        padding: 8px 12px;
         border: none;
-        border-radius: 4px;
+        border-radius: 6px;
         cursor: pointer;
-        margin-right: 4px;
+        margin-right: 6px;
+        font-weight: 700;
       }
-      #logout {
-        text-decoration: none;
-        color: crimson;
-      }
-      input[type="file"] {
-        display: none;
-      }
+
+      #uploadBtn:hover, #newFolderBtn:hover { background: var(--yellow-dark); }
+
+      #logout { text-decoration: none; color: #ff6b6b; margin-left: 6px; }
+
+      input[type="file"] { display: none; }
+
       .renameBtn {
-        background: #28a745;
-        color: white;
-        padding: 4px 8px;
-        border: none;
-        border-radius: 3px;
+        background: rgba(250,220,121,0.12);
+        color: var(--yellow);
+        padding: 6px 10px;
+        border: 1px solid rgba(250,220,121,0.18);
+        border-radius: 6px;
         cursor: pointer;
-        font-size: 0.85em;
+        font-size: 0.9em;
       }
-      .renameBtn:hover {
-        background: #218838;
+
+      .renameBtn:hover { background: rgba(250,220,121,0.2); }
+
+      /* Small screens */
+      @media (max-width: 700px) {
+        body { padding: 12px; margin: 12px; }
+        header { flex-direction: column; align-items: flex-start; gap: 8px; }
+        table { font-size: 14px; }
+        th, td { padding: 8px; }
       }
     </style>
   </head>
