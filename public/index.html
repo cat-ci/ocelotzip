@@ -49,7 +49,9 @@
             position: relative;
         }
         .text-logo {
-            position: relative;
+            position: absolute;
+            transform: scale(1.2);
+            
         }
 
         #catci-logo {
@@ -140,20 +142,30 @@
                 background-position: -380px -375px;
             }
         }
+        .btn-start button {
+            background: linear-gradient(45deg, var(--yellow), var(--yellow-dark));
+            border: none;
+            padding: 15px 30px;
+            font-size: 20px;
+            color: var(--white);
+            cursor: pointer;
+            border-radius: 5px;
+        }
     </style>
 </head>
 
 <body>
     <div class="hero">
         <div class="logo">
-            <img src="ocelotzip.png" class="ocelot">
             <div class="text-logo">
                 <h1><span>Ocelot</span><span>.zip</span></h1>
                 <div class="oneko"></div>
             </div>
+                        <img src="ocelotzip.png" class="ocelot">
+
         </div>
         <h2>Make your media <span>responsive</span> and <span>fast</span></h2>
-        <a href="/signup"><button>Get Started</button></a>
+        <a class="btn-start" href="/signup"><button>Get Started</button></a>
     </div>
     <div class="why"></div>
     <footer>
