@@ -5,6 +5,10 @@ import fs from "fs";
 import session from "express-session";
 import fetch from "node-fetch";
 import crypto from "crypto";
+import archiver from "archiver";
+import { process as processImage } from "./modules/imageProcessor.js";
+import { process as processAudio } from "./modules/audioProcessor.js";
+import { process as processVideo } from "./modules/videoProcessor.js";
 
 const app = express();
 const PORT = 3000;
@@ -19,6 +23,8 @@ const baseUploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(baseUploadDir)) fs.mkdirSync(baseUploadDir);
 const accountsDir = path.join(process.cwd(), "accounts");
 if (!fs.existsSync(accountsDir)) fs.mkdirSync(accountsDir);
+const tempDir = path.join(process.cwd(), "temp");
+if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
 app.use(express.static("public"));
 app.use(express.json());
@@ -32,6 +38,24 @@ app.use(
 
 function safeName(name) {
   return name.replace(/[^a-zA-Z0-9_.-]/g, "_");
+}
+
+function isImageFile(filename) {
+  const imageExtensions = ['.png', '.jpg', '.jpeg', '.webp', '.avif', '.tiff', '.gif', '.bmp'];
+  const ext = path.extname(filename).toLowerCase();
+  return imageExtensions.includes(ext);
+}
+
+function isAudioFile(filename) {
+  const audioExtensions = ['.mp3', '.ogg', '.opus', '.wav', '.flac', '.m4a', '.aac', '.wma', '.aiff'];
+  const ext = path.extname(filename).toLowerCase();
+  return audioExtensions.includes(ext);
+}
+
+function isVideoFile(filename) {
+  const videoExtensions = ['.mp4', '.webm', '.mov', '.mkv', '.avi', '.flv', '.wmv', '.ogv', '.m4v', '.3gp', '.ts', '.mts', '.m2ts'];
+  const ext = path.extname(filename).toLowerCase();
+  return videoExtensions.includes(ext);
 }
 function getUserDir(username) {
   const dir = path.join(baseUploadDir, safeName(username));
@@ -92,6 +116,101 @@ function findUserByApiKey(key) {
     if (acc.apiKey === key) return acc;
   }
   return null;
+}
+
+// Generate a 6-character alphanumeric slug
+function generateSlug() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let slug = '';
+  for (let i = 0; i < 6; i++) {
+    slug += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return slug;
+}
+
+// Get slug mapping file for a user
+function getSlugMapFile(username) {
+  return path.join(accountsDir, safeName(username) + ".slugs.json");
+}
+
+// Get slug mapping for a user
+function getSlugMap(username) {
+  const file = getSlugMapFile(username);
+  if (!fs.existsSync(file)) {
+    return {};
+  }
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+// Save slug mapping for a user
+function saveSlugMap(username, slugMap) {
+  const file = getSlugMapFile(username);
+  fs.writeFileSync(file, JSON.stringify(slugMap, null, 2));
+}
+
+// Resolve a file by slug or pretty name to the actual filename
+function resolveFileBySlugOrName(username, nameOrSlug) {
+  const userDir = getUserDir(username);
+  const slugMap = getSlugMap(username);
+  
+  // Try as slug first (6 chars, alphanumeric)
+  if (/^[a-z0-9]{6}$/.test(nameOrSlug) && slugMap[nameOrSlug]) {
+    return slugMap[nameOrSlug].timestamp;
+  }
+  
+  // Try as pretty name (original filename)
+  // Look for any file that ends with this name or contains it
+  try {
+    const files = fs.readdirSync(userDir);
+    for (const file of files) {
+      if (file.endsWith('-' + nameOrSlug) || file === nameOrSlug) {
+        return file;
+      }
+    }
+  } catch (err) {
+    // Directory doesn't exist or other error
+  }
+  
+  // Not found
+  return null;
+}
+
+// Cache cleanup function - removes cached files older than 4 weeks (28 days)
+function cleanupOldCache() {
+  const FOUR_WEEKS_MS = 28 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  
+  if (!fs.existsSync(tempDir)) return;
+  
+  try {
+    const files = fs.readdirSync(tempDir);
+    for (const file of files) {
+      const filePath = path.join(tempDir, file);
+      const stat = fs.statSync(filePath);
+      
+      if (stat.isFile() && now - stat.mtimeMs > FOUR_WEEKS_MS) {
+        fs.unlinkSync(filePath);
+        console.log(`[cache] Removed old cached file: ${file}`);
+      }
+    }
+  } catch (err) {
+    console.error('[cache] Cleanup error:', err.message);
+  }
+}
+
+// Run cleanup every 24 hours
+setInterval(cleanupOldCache, 24 * 60 * 60 * 1000);
+
+// Generate cache key for a file with parameters
+function getCacheKey(filePath, params) {
+  return crypto
+    .createHash('md5')
+    .update(filePath + JSON.stringify(params))
+    .digest('hex');
 }
 
 function authenticate(req, res, next) {
@@ -183,12 +302,50 @@ app.get("/api/files", authenticate, (req, res) => {
   try {
     const targetDir = resolveUserPath(username, subPath);
     fs.mkdirSync(targetDir, { recursive: true });
+    let slugMap = getSlugMap(username);
+    
     const items = fs.readdirSync(targetDir).map((name) => {
       const full = path.join(targetDir, name);
       const stat = fs.statSync(full);
       const rel = path.relative(getUserDir(username), full);
+      
+      // Find or create slug for this file
+      let slug = null;
+      let originalName = path.parse(name).name; // default: filename without extension
+      
+      if (!stat.isDirectory()) {
+        // Look for existing slug
+        for (const [s, mapping] of Object.entries(slugMap)) {
+          if (mapping.timestamp === name) {
+            slug = s;
+            originalName = mapping.original;
+            break;
+          }
+        }
+        
+        // If no slug found, create one for this file
+        if (!slug) {
+          slug = generateSlug();
+          // Extract original name from timestamp-based filename
+          // Format: {timestamp}-{originalname}{ext}
+          const match = name.match(/^\d+-(.+)$/);
+          const extracted = match ? match[1] : originalName;
+          const nameOnly = path.parse(extracted).name;
+          
+          slugMap[slug] = {
+            timestamp: name,
+            original: nameOnly,
+            created: new Date().toISOString()
+          };
+          saveSlugMap(username, slugMap);
+          originalName = nameOnly;
+        }
+      }
+      
       return {
         name,
+        originalName,
+        slug,
         isDir: stat.isDirectory(),
         size: stat.isFile() ? stat.size : 0,
         mtime: stat.mtime,
@@ -262,6 +419,26 @@ app.post("/api/rename", authenticate, (req, res) => {
   }
 });
 
+app.post("/api/delete", authenticate, (req, res) => {
+  const username = req.authUser;
+  const { path: filePath } = req.body;
+  if (!filePath) return res.status(400).json({ error: "Missing file path" });
+  try {
+    const target = resolveUserPath(username, filePath);
+    const stat = fs.statSync(target);
+    
+    if (stat.isDirectory()) {
+      fs.rmSync(target, { recursive: true, force: true });
+    } else {
+      fs.unlinkSync(target);
+    }
+    
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.post("/api/upload", authenticate, upload.single("file"), (req, res) => {
   try {
     const username = req.authUser;
@@ -275,7 +452,25 @@ app.post("/api/upload", authenticate, upload.single("file"), (req, res) => {
     }
     acc.usedBytes = used;
     fs.writeFileSync(getAccountFile(username), JSON.stringify(acc, null, 2));
-    res.json({ success: true });
+    
+    // Generate slug and store mapping
+    const slug = generateSlug();
+    const slugMap = getSlugMap(username);
+    const originalName = path.parse(req.file.originalname).name;
+    
+    slugMap[slug] = {
+      timestamp: req.file.filename,
+      original: originalName,
+      created: new Date().toISOString()
+    };
+    saveSlugMap(username, slugMap);
+    
+    res.json({ 
+      success: true,
+      slug,
+      timestamp: req.file.filename,
+      original: originalName
+    });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -286,6 +481,209 @@ app.get("/api/apikey", (req, res) => {
   const username = req.session.user.username;
   const acc = getOrCreateAccount(username, req.session.user.email);
   res.json({ apiKey: acc.apiKey });
+});
+
+// Package API - creates a ZIP of multiple files with transformations
+app.post("/api/package", async (req, res) => {
+  try {
+    const { username, files } = req.body;
+
+    if (!username) {
+      return res.status(400).json({ error: "username required" });
+    }
+
+    if (!files || !Array.isArray(files) || files.length === 0) {
+      return res.status(400).json({ error: "files array required" });
+    }
+
+    // Generate unique package ID
+    const packageId = crypto.randomBytes(8).toString('hex');
+    const zipPath = path.join(tempDir, `package_${packageId}.zip`);
+
+    // Create zip archive
+    const output = fs.createWriteStream(zipPath);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+
+    archive.pipe(output);
+
+    // Process each file
+    for (const file of files) {
+      const { path: filePath, ...params } = file;
+      
+      if (!filePath) continue;
+
+      try {
+        const fullPath = resolveUserPath(username, filePath);
+
+        // Check if file exists
+        if (!fs.existsSync(fullPath)) {
+          console.warn(`[package] File not found: ${filePath}`);
+          continue;
+        }
+
+        let processedPath = fullPath;
+        const fileName = path.basename(filePath);
+
+        // Process image files
+        if (isImageFile(fullPath) && Object.keys(params).length > 0) {
+          const cacheKey = getCacheKey(fullPath, params);
+          const cachedFiles = fs.readdirSync(tempDir).filter(f => f.startsWith(cacheKey));
+          
+          if (cachedFiles.length > 0) {
+            processedPath = path.join(tempDir, cachedFiles[0]);
+          } else {
+            processedPath = await processImage(fullPath, params, tempDir);
+          }
+        }
+        // Process audio files
+        else if (isAudioFile(fullPath) && Object.keys(params).length > 0) {
+          const cacheKey = getCacheKey(fullPath, params);
+          const cachedFiles = fs.readdirSync(tempDir).filter(f => f.startsWith(cacheKey));
+          
+          if (cachedFiles.length > 0) {
+            processedPath = path.join(tempDir, cachedFiles[0]);
+          } else {
+            processedPath = await processAudio(fullPath, params, tempDir);
+          }
+        }
+        // Process video files
+        else if (isVideoFile(fullPath) && Object.keys(params).length > 0) {
+          const cacheKey = getCacheKey(fullPath, params);
+          const cachedFiles = fs.readdirSync(tempDir).filter(f => f.startsWith(cacheKey));
+          
+          if (cachedFiles.length > 0) {
+            processedPath = path.join(tempDir, cachedFiles[0]);
+          } else {
+            processedPath = await processVideo(fullPath, params, tempDir);
+          }
+        }
+
+        // Add file to zip with transformed name if format changed
+        let archiveName = fileName;
+        if (params.f) {
+          const ext = params.f.toLowerCase();
+          archiveName = path.parse(fileName).name + '.' + ext;
+        }
+
+        archive.file(processedPath, { name: archiveName });
+        console.log(`[package] Added to zip: ${archiveName}`);
+      } catch (err) {
+        console.error(`[package] Error processing ${filePath}:`, err.message);
+      }
+    }
+
+    // Finalize archive
+    archive.on('error', (err) => {
+      console.error('[package] Archive error:', err);
+      res.status(500).json({ error: 'Failed to create package' });
+    });
+
+    output.on('finish', () => {
+      const fileSize = fs.statSync(zipPath).size;
+      console.log(`[package] Created package ${packageId} (${fileSize} bytes)`);
+      
+      res.download(zipPath, `package_${packageId}.zip`, (err) => {
+        if (err) console.error('[package] Download error:', err);
+      });
+    });
+
+    archive.finalize();
+  } catch (err) {
+    console.error('[package] Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Dynamic image, audio, and video processing route for /files/<username>/<path> (must come before static serving)
+app.get(/^\/files\/([^/]+)\/(.+)$/, async (req, res, next) => {
+  try {
+    const username = req.params[0];
+    let nameOrSlug = req.params[1];
+    
+    // Resolve the filename from slug or pretty name
+    const actualFilename = resolveFileBySlugOrName(username, nameOrSlug);
+    
+    if (!actualFilename) {
+      return res.status(404).json({ error: "File not found" });
+    }
+    
+    const fullPath = resolveUserPath(username, actualFilename);
+
+    // Check if file exists
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    // Handle image files
+    if (isImageFile(fullPath)) {
+      // If no transformation parameters, serve the original file
+      if (!req.query.w && !req.query.h && !req.query.s && !req.query.f && !req.query.q) {
+        return res.sendFile(fullPath);
+      }
+
+      // Check if cached version exists
+      const cacheKey = getCacheKey(fullPath, req.query);
+      const ext = path.extname(fullPath).slice(1).toLowerCase();
+      const cachedPath = path.join(tempDir, `${cacheKey}.*`);
+      const files = fs.readdirSync(tempDir).filter(f => f.startsWith(cacheKey));
+      
+      if (files.length > 0) {
+        console.log(`[cache] Image cache hit: ${files[0]}`);
+        return res.sendFile(path.join(tempDir, files[0]));
+      }
+
+      // Process the image with the provided parameters
+      const processedPath = await processImage(fullPath, req.query, tempDir);
+      return res.sendFile(processedPath);
+    }
+
+    // Handle audio files
+    if (isAudioFile(fullPath)) {
+      // If no transformation parameters, serve the original file
+      if (!req.query.f && !req.query.q) {
+        return res.sendFile(fullPath);
+      }
+
+      // Check if cached version exists
+      const cacheKey = getCacheKey(fullPath, req.query);
+      const files = fs.readdirSync(tempDir).filter(f => f.startsWith(cacheKey));
+      
+      if (files.length > 0) {
+        console.log(`[cache] Audio cache hit: ${files[0]}`);
+        return res.sendFile(path.join(tempDir, files[0]));
+      }
+
+      // Process the audio with the provided parameters
+      const processedPath = await processAudio(fullPath, req.query, tempDir);
+      return res.sendFile(processedPath);
+    }
+
+    // Handle video files
+    if (isVideoFile(fullPath)) {
+      // If no transformation parameters, serve the original file
+      if (!req.query.w && !req.query.h && !req.query.s && !req.query.f && !req.query.q) {
+        return res.sendFile(fullPath);
+      }
+
+      // Check if cached version exists
+      const cacheKey = getCacheKey(fullPath, req.query);
+      const files = fs.readdirSync(tempDir).filter(f => f.startsWith(cacheKey));
+      
+      if (files.length > 0) {
+        console.log(`[cache] Video cache hit: ${files[0]}`);
+        return res.sendFile(path.join(tempDir, files[0]));
+      }
+
+      // Process the video with the provided parameters
+      const processedPath = await processVideo(fullPath, req.query, tempDir);
+      return res.sendFile(processedPath);
+    }
+
+    // Not an image, audio, or video file, let static middleware handle it
+    return next();
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.use("/files", express.static(baseUploadDir));

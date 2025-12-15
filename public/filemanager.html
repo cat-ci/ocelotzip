@@ -82,6 +82,39 @@
 
       .renameBtn:hover { background: rgba(250,220,121,0.2); }
 
+      .deleteBtn {
+        background: rgba(255,107,107,0.12);
+        color: #ff6b6b;
+        padding: 6px 10px;
+        border: 1px solid rgba(255,107,107,0.18);
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.9em;
+        margin-left: 6px;
+      }
+
+      .deleteBtn:hover { background: rgba(255,107,107,0.2); }
+
+      .urlsContainer {
+        font-size: 0.8em;
+        color: rgba(240,237,226,0.6);
+        margin-top: 4px;
+        padding: 6px;
+        background: rgba(0,0,0,0.3);
+        border-radius: 4px;
+      }
+
+      .urlRow {
+        margin: 3px 0;
+        font-family: 'Courier New', monospace;
+        word-break: break-all;
+      }
+
+      .urlLabel {
+        color: rgba(250,220,121,0.7);
+        margin-right: 4px;
+      }
+
       /* Small screens */
       @media (max-width: 700px) {
         body { padding: 12px; margin: 12px; }
@@ -158,11 +191,33 @@
             if (item.isDir) {
               tr.innerHTML = `<td><a href='#' data-dir='${item.path}'>📁 ${
                 item.name
-              }</a></td><td>-</td><td>${date}</td><td><button class='renameBtn' data-path='${item.path}' data-name='${item.name}'>Rename</button></td>`;
+              }</a></td><td>-</td><td>${date}</td><td><button class='renameBtn' data-path='${item.path}' data-name='${item.name}'>Rename</button><button class='deleteBtn' data-path='${item.path}'>Delete</button></td>`;
             } else {
-              tr.innerHTML = `<td><a href='${item.url}' target='_blank'>${item.name}</a></td><td>${bytesToMB(
+              const timestamp = item.name;
+              const original = item.originalName;
+              const slug = item.slug;
+              const username = data.username;
+              
+              let urlsHtml = '';
+              if (slug) {
+                urlsHtml = `
+                  <div class="urlsContainer">
+                    <div class="urlRow"><span class="urlLabel">Short:</span>/files/${username}/${slug}</div>
+                    <div class="urlRow"><span class="urlLabel">Pretty:</span>/files/${username}/${original}</div>
+                    <div class="urlRow"><span class="urlLabel">Timestamp:</span>/files/${username}/${timestamp}</div>
+                  </div>
+                `;
+              } else {
+                urlsHtml = `
+                  <div class="urlsContainer">
+                    <div class="urlRow"><span class="urlLabel">URL:</span>/files/${username}/${original}</div>
+                  </div>
+                `;
+              }
+              
+              tr.innerHTML = `<td><a href='${item.url}' target='_blank'>${item.name}</a>${urlsHtml}</td><td>${bytesToMB(
                 item.size
-              )}</td><td>${date}</td><td><button class='renameBtn' data-path='${item.path}' data-name='${item.name}'>Rename</button></td>`;
+              )}</td><td>${date}</td><td><button class='renameBtn' data-path='${item.path}' data-name='${item.name}'>Rename</button><button class='deleteBtn' data-path='${item.path}'>Delete</button></td>`;
             }
             tbody.appendChild(tr);
           }
@@ -229,6 +284,22 @@
             alert(err.error);
           }
           fetchFiles();
+        }
+        
+        if (e.target.classList.contains("deleteBtn")) {
+          const filePath = e.target.dataset.path;
+          if (!confirm("Are you sure you want to delete this?")) return;
+          const res = await fetch("/api/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path: filePath }),
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            alert(err.error);
+          } else {
+            fetchFiles();
+          }
         }
       });
 
