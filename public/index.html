@@ -73,7 +73,8 @@
 
         .text-logo {
             position: relative;
-            transform: scale(1.1);
+            transform: scale(1.1) translateX(6%);
+
         }
 
         #catci-logo {
@@ -168,20 +169,23 @@
             text-decoration: underline;
             transition: 0.2s;
         }
+
         .btn-start button:hover {
             background-color: var(--yellow);
         }
-       
+
         .hero .text {
             margin-top: 60px;
         }
-        .hero .text h2{
+
+        .hero .text h2 {
             font-size: 36px;
             margin: 0;
             padding: 0;
             text-align: left;
         }
-        .hero .text p{
+
+        .hero .text p {
             font-size: 18px;
             line-height: 1.5;
             text-align: left;
@@ -195,7 +199,7 @@
             border: 0;
             height: 1px;
             margin: 48px 0;
-            background: linear-gradient(90deg, transparent, rgba(240,237,226,0.06), transparent);
+            background: linear-gradient(90deg, transparent, rgba(240, 237, 226, 0.06), transparent);
             opacity: 0.8;
         }
 
@@ -226,14 +230,21 @@
         }
 
         .tile {
-            background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
-            border: 1px solid rgba(255,255,255,0.04);
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.01));
+            border: 1px solid rgba(255, 255, 255, 0.04);
             padding: 18px;
             border-radius: 10px;
             text-align: left;
             min-height: 120px;
             height: 160px;
-            box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+            transition: 3s background, 0.3s box-shadow, 0.3s transform;
+        }
+
+        .tile:hover {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+            transform: translateY(-20px);
         }
 
         .tile h3 {
@@ -276,22 +287,57 @@
         .btn-start {
             display: inline-block;
             margin-top: 18px;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
         }
 
         .btn-start button {
-            box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
         }
 
         /* Responsive tweaks */
         @media (max-width: 900px) {
-            h1 { font-size: 46px; height: auto; }
-            h1 span:last-child { top: 40px; }
-            #ocelot-logo { position: static; width: 300px; top: auto; left: auto; }
-            .hero { flex-direction: column; align-items: center; }
-            .hero-1 { padding: 24px; }
-            .ocelot { height: auto; width: 80%; max-width: 420px; }
-            .hero .text p { width: 100%; min-width: 0; }
-            .tiles { width: 94%; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); }
+            h1 {
+                font-size: 46px;
+                height: auto;
+            }
+
+            h1 span:last-child {
+                top: 40px;
+            }
+
+            #ocelot-logo {
+                position: static;
+                width: 300px;
+                top: auto;
+                left: auto;
+            }
+
+            .hero {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .hero-1 {
+                padding: 24px;
+            }
+
+            .ocelot {
+                height: auto;
+                width: 80%;
+                max-width: 420px;
+            }
+
+            .hero .text p {
+                width: 100%;
+                min-width: 0;
+            }
+
+            .tiles {
+                width: 94%;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            }
         }
     </style>
 </head>
@@ -308,7 +354,9 @@
             </div>
             <div class="text">
                 <h2>Make your media<br><span>responsive</span> and <span>fast</span></h2>
-                <p>Ocelot.zip is a free, simple, and blazing-fast processor for your images, videos, and audio files. Instantly convert, resize, and optimize your media for any device or CDN – no duplicates, no hassle. </p>
+                <p>Ocelot.zip is a free, simple, and blazing-fast processor for your images, videos, and audio files.
+                    Instantly convert, resize, and optimize your media for any device or CDN – no duplicates, no hassle.
+                </p>
                 <a class="btn-start" href="/signup"><button>Get Started</button></a>
             </div>
         </div>
@@ -321,15 +369,18 @@
         <div class="tiles">
             <div class="tile">
                 <h3>One file, Infinite Formats</h3>
-                <p>Store a single copy of your media and deliver it in any format or size on demand. No more managing duplicates for every device or browser.</p>
+                <p>Store a single copy of your media and deliver it in any format or size on demand. No more managing
+                    duplicates for every device or browser.</p>
             </div>
             <div class="tile">
                 <h3>Lightning Fast</h3>
-                <p>Ocelot.zip is optimized for speed. Even large files are processed in seconds, with up to 1000 requests per minute per user.</p>
+                <p>Ocelot.zip is optimized for speed. Even large files are processed in seconds, with up to 1000
+                    requests per minute per user.</p>
             </div>
             <div class="tile">
                 <h3>Generous Free Tier</h3>
-                <p>Enjoy 10GB of free local storage and unlimited bandwidth for personal and commercial use. Upgrade only if you need more.</p>
+                <p>Enjoy 10GB of free local storage and unlimited bandwidth for personal and commercial use. Upgrade
+                    only if you need more.</p>
             </div>
             <div class="tile">
                 <h3>Easy CDN Integration</h3>
@@ -337,35 +388,49 @@
             </div>
             <div class="tile">
                 <h3>Privacy First</h3>
-                <p>Your media is yours. We do not track, sell, or share your data. Enjoy peace of mind with our strict privacy policies.</p>
+                <p>Your media is yours. We do not track, sell, or share your data. Enjoy peace of mind with our strict
+                    privacy policies.</p>
             </div>
             <div class="tile">
                 <h3>Developer Friendly</h3>
-                <p>Robust API and documentation make it easy to integrate Ocelot.zip into your existing workflows and applications.</p>
+                <p>Robust API and documentation make it easy to integrate Ocelot.zip into your existing workflows and
+                    applications.</p>
             </div>
             <div class="tile">
                 <h3>Open & Free</h3>
-                <p>Ocelot.zip is completely free to use for everyone. We believe in open access to powerful media processing tools.</p>
+                <p>Ocelot.zip is completely free to use for everyone. We believe in open access to powerful media
+                    processing tools.</p>
             </div>
             <div class="tile">
                 <h3>99.9% Uptime</h3>
-                <p>Reliable and consistent service with a 99.9% uptime guarantee, ensuring your media is always available when you need it.</p>
+                <p>Reliable and consistent service with a 99.9% uptime guarantee, ensuring your media is always
+                    available when you need it.</p>
             </div>
             <div class="tile">
                 <h3>Custom Pullzone</h3>
-                <p>Not a fan of limits or third parties holding your files? Simply input your custom pullzone URL and take full control.</p>
+                <p>Not a fan of limits or third parties holding your files? Simply input your custom pullzone URL and
+                    take full control.</p>
             </div>
         </div>
     </div>
     <hr>
     <div class="how">
-        
+        <h2>How It Works</h2>
+        <p>Upload your media files to Ocelot.zip via our intuitive web interface or robust API. Once uploaded, our
+            powerful processing engine automatically converts and optimizes your files into multiple formats and sizes,
+            tailored for various devices and network conditions. Access your media through simple URLs that can be
+            integrated seamlessly into your websites, applications, or CDNs. Enjoy real-time processing with no delays,
+            ensuring your users always receive the best possible experience.</p>
     </div>
-
+    <hr>
+    <div class="faq">
+        <h2>Frequently Asked Questions</h2>
+    </div>
     <footer>
         <a href="https://catci.net">
             <img src="catci-logo.png" id="catci-logo">
         </a>
+        <p>Ocelot.zip | Fast file hosting by catci</p>
         <p>© 2024 Ocelot.zip & catci.net. All rights reserved.</p>
     </footer>
 </body>
