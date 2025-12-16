@@ -11,12 +11,12 @@ import { process as processAudio } from "./modules/audioProcessor.js";
 import { process as processVideo } from "./modules/videoProcessor.js";
 
 const app = express();
-const PORT = 3000;
+const PORT = 4042;
 
-const CATCI_BASE = "http://localhost:4000";
+const CATCI_BASE = "https://accounts.catci.net";
 const CLIENT_ID = "filehost-app";   
-const CLIENT_SECRET = "super-secret-catci-key";
-const REDIRECT_URI = `http://localhost:${PORT}/auth/callback`;
+const CLIENT_SECRET = "secret";
+const REDIRECT_URI = `https://ocelot.zip/auth/callback`;
 const MAX_STORAGE_BYTES = 10 * 1024 * 1024 * 1024;
 
 const baseUploadDir = path.join(process.cwd(), "uploads");
@@ -273,8 +273,14 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 app.get("/", (req, res) => {
+  if (req.session.user)
+    return res.redirect("/filemanager");
+  res.sendFile(path.join(process.cwd(), "public", "home.html"));
+});
+
+app.get("/filemanager", (req, res) => {
   if (!req.session.user)
-    return res.sendFile(path.join(process.cwd(), "public", "home.html"));
+    return res.redirect("/");
   res.sendFile(path.join(process.cwd(), "public", "newfilemanager.html"));
 });
 
@@ -325,7 +331,7 @@ app.get("/auth/callback", async (req, res) => {
   req.session.user = user;
   getOrCreateAccount(user.username, user.email);
   req.session.save(() => {
-    res.redirect("/");
+    res.redirect("/filemanager");
   });
 });
 
