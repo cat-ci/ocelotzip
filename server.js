@@ -324,7 +324,9 @@ app.get("/auth/callback", async (req, res) => {
 
   req.session.user = user;
   getOrCreateAccount(user.username, user.email);
-  res.redirect("/");
+  req.session.save(() => {
+    res.redirect("/");
+  });
 });
 
 app.get("/logout", async (req, res) => {
