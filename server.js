@@ -275,7 +275,7 @@ const upload = multer({ storage });
 app.get("/", (req, res) => {
   if (!req.session.user)
     return res.sendFile(path.join(process.cwd(), "public", "home.html"));
-  res.sendFile(path.join(process.cwd(), "public", "filemanager.html"));
+  res.sendFile(path.join(process.cwd(), "public", "newfilemanager.html"));
 });
 
 app.get("/login", (req, res) => {

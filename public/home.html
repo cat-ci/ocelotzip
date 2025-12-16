@@ -403,6 +403,11 @@
                 grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             }
         }
+        .coming-soon {
+            opacity: 0.6;
+            pointer-events: none;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 
@@ -475,7 +480,7 @@
                 <p>Reliable and consistent service with a 99.9% uptime guarantee, ensuring your media is always
                     available when you need it.</p>
             </div>
-            <div class="tile">
+            <div class="tile coming-soon" title="coming soon">
                 <h3>Custom Pullzone</h3>
                 <p>Not a fan of limits or third parties holding your files? Simply input your custom pullzone URL and
                     take full control.</p>
