@@ -295,6 +295,36 @@
             display: none;
         }
 
+        /* Upload progress UI */
+        .upload-progress {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            margin-left: 8px;
+        }
+
+        .upload-progress-bar {
+            width: 200px;
+            height: 8px;
+            background: rgba(255,255,255,0.06);
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .upload-progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, rgba(250,220,121,0.9), rgba(233,190,17,0.95));
+            transition: width 0.15s linear;
+        }
+
+        .upload-progress-text {
+            font-size: 11px;
+            color: rgba(240,237,226,0.9);
+            white-space: nowrap;
+        }
+
         table.files tbody tr {
             cursor: default;
             transition: all 0.15s;
@@ -534,6 +564,12 @@
             <div class="toolbar-left">
                 <label for="fileInput" style="cursor: pointer; padding: 8px 12px; background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; font-size: 12px; transition: all 0.2s;" id="uploadBtn">Upload</label>
                 <input id="fileInput" type="file" name="files" multiple />
+                <div class="upload-progress" id="uploadProgressContainer" aria-hidden="true">
+                    <div class="upload-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100">
+                        <div class="upload-progress-fill" id="uploadProgressFill"></div>
+                    </div>
+                    <div class="upload-progress-text" id="uploadProgressText">0%</div>
+                </div>
                 <button id="new-folder">+ Folder</button>
                 <button id="refresh">Refresh</button>
             </div>
@@ -955,33 +991,70 @@
             }
         });
 
-        document.getElementById('fileInput')?.addEventListener('change', async (e) => {
+        document.getElementById('fileInput')?.addEventListener('change', (e) => {
             const files = Array.from(e.target.files || []);
             if (!files.length) return;
+            uploadFilesWithProgress(files);
+            e.target.value = '';
+        });
 
+        function uploadFilesWithProgress(files) {
+            const container = document.getElementById('uploadProgressContainer');
+            const fill = document.getElementById('uploadProgressFill');
+            const text = document.getElementById('uploadProgressText');
+            const uploadBtn = document.getElementById('uploadBtn');
+
+            container.style.display = 'flex';
+            container.setAttribute('aria-hidden', 'false');
+            fill.style.width = '0%';
+            text.textContent = '0%';
+            uploadBtn.setAttribute('aria-disabled', 'true');
+            uploadBtn.style.pointerEvents = 'none';
+
+            const xhr = new XMLHttpRequest();
             const form = new FormData();
             files.forEach(f => form.append('files', f));
 
-            try {
-                const res = await fetch('/api/upload-multi?path=' + encodeURIComponent(currentPath), {
-                    method: 'POST',
-                    body: form
-                });
-
-                if (!res.ok) {
-                    const err = await res.json();
-                    alert(err.error);
-                } else {
-                    const data = await res.json();
-                    updateStatus(`Uploaded ${files.length} file${files.length === 1 ? '' : 's'}`);
-                    fetchFiles();
+            xhr.upload.addEventListener('progress', (ev) => {
+                if (ev.lengthComputable) {
+                    const pct = Math.round((ev.loaded / ev.total) * 100);
+                    fill.style.width = pct + '%';
+                    text.textContent = pct + '%';
                 }
-            } catch (error) {
-                alert('Upload failed: ' + error.message);
-            }
+            });
 
-            e.target.value = '';
-        });
+            xhr.addEventListener('load', () => {
+                uploadBtn.removeAttribute('aria-disabled');
+                uploadBtn.style.pointerEvents = '';
+                container.style.display = 'none';
+                container.setAttribute('aria-hidden', 'true');
+
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const data = JSON.parse(xhr.responseText || '{}');
+                        updateStatus(`Uploaded ${files.length} file${files.length === 1 ? '' : 's'}`);
+                    } catch (err) {
+                        updateStatus('Upload completed');
+                    }
+                    fetchFiles();
+                } else {
+                    let msg = 'Upload failed';
+                    try { msg = JSON.parse(xhr.responseText).error || msg; } catch (e) {}
+                    alert(msg + ` (status ${xhr.status})`);
+                }
+            });
+
+            xhr.addEventListener('error', () => {
+                uploadBtn.removeAttribute('aria-disabled');
+                uploadBtn.style.pointerEvents = '';
+                container.style.display = 'none';
+                container.setAttribute('aria-hidden', 'true');
+                alert('Upload failed due to a network error.');
+            });
+
+            xhr.open('POST', '/api/upload-multi?path=' + encodeURIComponent(currentPath));
+            xhr.send(form);
+        }
 
         document.getElementById('uploadBtn')?.addEventListener('click', (e) => {
             document.getElementById('fileInput').click();
