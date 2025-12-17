@@ -6,18 +6,21 @@ import session from "express-session";
 import fetch from "node-fetch";
 import crypto from "crypto";
 import archiver from "archiver";
+import dotenv from "dotenv";
 import { process as processImage } from "./modules/imageProcessor.js";
 import { process as processAudio } from "./modules/audioProcessor.js";
 import { process as processVideo } from "./modules/videoProcessor.js";
 
-const app = express();
-const PORT = 4042;
+dotenv.config();
 
-const CATCI_BASE = "https://accounts.catci.net";
-const CLIENT_ID = "filehost-app";   
-const CLIENT_SECRET = "secret";
-const REDIRECT_URI = `https://ocelot.zip/auth/callback`;
-const MAX_STORAGE_BYTES = 10 * 1024 * 1024 * 1024;
+const app = express();
+const PORT = process.env.PORT || 4042;
+
+const CATCI_BASE = process.env.CATCI_BASE;
+const CLIENT_ID = process.env.CLIENT_ID;
+const CLIENT_SECRET = process.env.CLIENT_SECRET;
+const REDIRECT_URI = process.env.REDIRECT_URI;
+const MAX_STORAGE_BYTES = parseInt(process.env.MAX_STORAGE_BYTES) || (10 * 1024 * 1024 * 1024);
 
 const baseUploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(baseUploadDir)) fs.mkdirSync(baseUploadDir);
@@ -30,7 +33,7 @@ app.use(express.static("public"));
 app.use(express.json());
 app.use(
   session({
-    secret: "change-this-session-secret",
+    secret: process.env.SESSION_SECRET || "change-this-session-secret",
     resave: false,
     saveUninitialized: false,
   })
