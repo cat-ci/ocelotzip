@@ -533,7 +533,7 @@
         <div class="toolbar">
             <div class="toolbar-left">
                 <label for="fileInput" style="cursor: pointer; padding: 8px 12px; background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; font-size: 12px; transition: all 0.2s;" id="uploadBtn">Upload</label>
-                <input id="fileInput" type="file" />
+                <input id="fileInput" type="file" name="files" multiple />
                 <button id="new-folder">+ Folder</button>
                 <button id="refresh">Refresh</button>
             </div>
@@ -956,29 +956,30 @@
         });
 
         document.getElementById('fileInput')?.addEventListener('change', async (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            
+            const files = Array.from(e.target.files || []);
+            if (!files.length) return;
+
             const form = new FormData();
-            form.append('file', file);
-            
+            files.forEach(f => form.append('files', f));
+
             try {
-                const res = await fetch('/api/upload?path=' + encodeURIComponent(currentPath), {
+                const res = await fetch('/api/upload-multi?path=' + encodeURIComponent(currentPath), {
                     method: 'POST',
                     body: form
                 });
-                
+
                 if (!res.ok) {
                     const err = await res.json();
                     alert(err.error);
                 } else {
-                    updateStatus(`Uploaded: ${file.name}`);
+                    const data = await res.json();
+                    updateStatus(`Uploaded ${files.length} file${files.length === 1 ? '' : 's'}`);
                     fetchFiles();
                 }
             } catch (error) {
                 alert('Upload failed: ' + error.message);
             }
-            
+
             e.target.value = '';
         });
 

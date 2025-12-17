@@ -535,6 +535,211 @@ app.post("/api/upload", authenticate, upload.single("file"), (req, res) => {
   }
 });
 
+// Multi-file upload endpoint
+app.post("/api/upload-multi", authenticate, upload.array("files"), (req, res) => {
+  try {
+    const username = req.authUser;
+    const acc = getOrCreateAccount(username, "");
+
+    const usedBefore = getUsedStorageBytes(username);
+    const totalUploaded = (req.files || []).reduce((s, f) => s + (f.size || 0), 0);
+
+    if (usedBefore + totalUploaded > acc.maxBytes) {
+      // Remove files written by multer
+      (req.files || []).forEach((f) => {
+        try { fs.unlinkSync(f.path); } catch (e) {}
+      });
+      return res.status(400).json({ error: "Storage quota exceeded" });
+    }
+
+    acc.usedBytes = usedBefore + totalUploaded;
+    fs.writeFileSync(getAccountFile(username), JSON.stringify(acc, null, 2));
+
+    const slugMap = getSlugMap(username);
+    const sub = req.query.path || "";
+    const uploaded = [];
+
+    for (const f of (req.files || [])) {
+      const slug = generateSlug();
+      const originalName = path.parse(f.originalname).name;
+      const relPath = path.join(sub, f.filename);
+      slugMap[slug] = {
+        timestamp: relPath,
+        original: originalName,
+        created: new Date().toISOString()
+      };
+      uploaded.push({ slug, timestamp: relPath, original: originalName });
+    }
+
+    saveSlugMap(username, slugMap);
+
+    res.json({ success: true, files: uploaded });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// CATCI service authentication middleware
+function catciAuth(req, res, next) {
+  const expected = process.env.CATCI_SECRET || process.env.CATCI_SERVICE_SECRET;
+  if (!expected) return res.status(500).json({ error: "CATCI secret not configured" });
+  const authHeader = req.headers.authorization || "";
+  const bearer = authHeader.match(/^Bearer (.+)$/);
+  const secret = req.headers['x-catci-secret'] || (bearer && bearer[1]) || req.query.catci_secret || (req.body && req.body.catci_secret);
+  if (!secret) return res.status(401).json({ error: "Missing CATCI secret" });
+  if (secret !== expected) return res.status(401).json({ error: "Unauthorized" });
+  next();
+}
+
+// Helper to set req.authUser for routes that reuse existing upload storage logic
+function setAuthUserFromCatci(req, res, next) {
+  const username = req.query.username || req.headers['x-catci-username'] || (req.body && req.body.username);
+  if (!username) return res.status(400).json({ error: "username required" });
+  req.authUser = username;
+  // allow path via header as multipart won't populate body before multer
+  if (!req.query.path && req.headers['x-catci-path']) req.query.path = req.headers['x-catci-path'];
+  next();
+}
+
+// Create user (idempotent)
+app.post('/catci/create-user', catciAuth, (req, res) => {
+  const { username, email } = req.body || {};
+  if (!username) return res.status(400).json({ error: 'username required' });
+  try {
+    const acc = getOrCreateAccount(username, email || '');
+    res.json({ success: true, username: acc.username, apiKey: acc.apiKey });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// CATCI create folder for a user
+app.post('/catci/folder', catciAuth, (req, res) => {
+  const { username, sub = '', name } = req.body || {};
+  if (!username || !name) return res.status(400).json({ error: 'username and name required' });
+  try {
+    const newPath = resolveUserPath(username, path.join(sub, name));
+    fs.mkdirSync(newPath, { recursive: true });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// CATCI single file upload (multipart). Specify username via query/header `username` or query param.
+app.post('/catci/upload', catciAuth, setAuthUserFromCatci, upload.single('file'), (req, res) => {
+  try {
+    const username = req.authUser;
+    const acc = getOrCreateAccount(username, '');
+    const used = getUsedStorageBytes(username);
+    if (used > acc.maxBytes) {
+      if (req.file) try { fs.unlinkSync(req.file.path); } catch (e) {}
+      return res.status(400).json({ error: 'Storage quota exceeded' });
+    }
+    // update used bytes
+    acc.usedBytes = getUsedStorageBytes(username);
+    fs.writeFileSync(getAccountFile(username), JSON.stringify(acc, null, 2));
+
+    // Generate slug and store mapping
+    const slug = generateSlug();
+    const slugMap = getSlugMap(username);
+    const originalName = path.parse(req.file.originalname).name;
+    const sub = req.query.path || '';
+    const relPath = path.join(sub, req.file.filename);
+
+    slugMap[slug] = {
+      timestamp: relPath,
+      original: originalName,
+      created: new Date().toISOString()
+    };
+    saveSlugMap(username, slugMap);
+
+    res.json({ success: true, slug, timestamp: relPath, original: originalName });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// CATCI multi-file upload
+app.post('/catci/upload-multi', catciAuth, setAuthUserFromCatci, upload.array('files'), (req, res) => {
+  try {
+    const username = req.authUser;
+    const acc = getOrCreateAccount(username, '');
+
+    const usedBefore = getUsedStorageBytes(username);
+    const totalUploaded = (req.files || []).reduce((s, f) => s + (f.size || 0), 0);
+
+    if (usedBefore + totalUploaded > acc.maxBytes) {
+      (req.files || []).forEach((f) => { try { fs.unlinkSync(f.path); } catch (e) {} });
+      return res.status(400).json({ error: 'Storage quota exceeded' });
+    }
+
+    acc.usedBytes = usedBefore + totalUploaded;
+    fs.writeFileSync(getAccountFile(username), JSON.stringify(acc, null, 2));
+
+    const slugMap = getSlugMap(username);
+    const sub = req.query.path || '';
+    const uploaded = [];
+
+    for (const f of (req.files || [])) {
+      const slug = generateSlug();
+      const originalName = path.parse(f.originalname).name;
+      const relPath = path.join(sub, f.filename);
+      slugMap[slug] = { timestamp: relPath, original: originalName, created: new Date().toISOString() };
+      uploaded.push({ slug, timestamp: relPath, original: originalName });
+    }
+
+    saveSlugMap(username, slugMap);
+    res.json({ success: true, files: uploaded });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// CATCI file operations: move, rename, delete (require username)
+app.post('/catci/move', catciAuth, (req, res) => {
+  const { username, from, to } = req.body || {};
+  if (!username || !from || !to) return res.status(400).json({ error: 'username, from and to required' });
+  try {
+    const src = resolveUserPath(username, from);
+    const dest = resolveUserPath(username, to);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.renameSync(src, dest);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/catci/rename', catciAuth, (req, res) => {
+  const { username, path: filePath, newName } = req.body || {};
+  if (!username || !filePath || !newName) return res.status(400).json({ error: 'username, path and newName required' });
+  try {
+    const src = resolveUserPath(username, filePath);
+    const dir = path.dirname(src);
+    const dest = path.join(dir, safeName(newName));
+    if (fs.existsSync(dest)) return res.status(400).json({ error: 'File with that name already exists' });
+    fs.renameSync(src, dest);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/catci/delete', catciAuth, (req, res) => {
+  const { username, path: filePath } = req.body || {};
+  if (!username || !filePath) return res.status(400).json({ error: 'username and path required' });
+  try {
+    const target = resolveUserPath(username, filePath);
+    const stat = fs.statSync(target);
+    if (stat.isDirectory()) fs.rmSync(target, { recursive: true, force: true });
+    else fs.unlinkSync(target);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.get("/api/apikey", (req, res) => {
   if (!req.session.user) return res.status(401).json({ error: "Not logged in" });
   const username = req.session.user.username;
