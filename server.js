@@ -41,7 +41,7 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static("public"));
-app.use(express.json());
+app.use(express.json({ limit: '50mb' })); // Increase JSON body limit
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "change-this-session-secret",
@@ -94,7 +94,7 @@ function getUsedStorageBytes(username) {
   return total;
 }
 function getOrCreateAccount(username, email) {
-  const file = getAccountFile(username);
+  const file = getAccountFile(username);d
   if (!fs.existsSync(file)) {
     const apiKey = crypto.randomBytes(24).toString("hex");
     const acc = {
@@ -284,7 +284,12 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => cb(null, Date.now() + "-" + safeName(file.originalname)),
 });
-const upload = multer({ storage });
+const upload = multer({ 
+  storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 * 1024, // 10 GB max file size
+  }
+});
 
 app.get("/", (req, res) => {
   if (req.session.user)
