@@ -676,15 +676,16 @@ app.post("/api/upload-multi", authenticate, upload.array("files"), (req, res) =>
 });
 
 // Chunked upload endpoint for large files (bypasses Cloudflare 100MB limit)
+const chunksDir = path.join(tempDir, 'chunks');
+if (!fs.existsSync(chunksDir)) fs.mkdirSync(chunksDir, { recursive: true });
+
 const chunkStorage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const chunksDir = path.join(tempDir, 'chunks');
-    fs.mkdirSync(chunksDir, { recursive: true });
     cb(null, chunksDir);
   },
   filename: (req, file, cb) => {
-    const { uploadId, chunkIndex } = req.body;
-    cb(null, `${uploadId}-chunk-${chunkIndex}`);
+    // Use timestamp as temp name, will rename after getting uploadId from body
+    cb(null, `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
   }
 });
 const chunkUpload = multer({ storage: chunkStorage });
@@ -697,9 +698,13 @@ app.post("/api/upload-chunk", authenticate, chunkUpload.single("chunk"), async (
     const chunkIndexNum = parseInt(chunkIndex);
     const totalChunksNum = parseInt(totalChunks);
 
+    // Rename the temp file to proper chunk name
+    const tempPath = req.file.path;
+    const chunkPath = path.join(chunksDir, `${uploadId}-chunk-${chunkIndex}`);
+    fs.renameSync(tempPath, chunkPath);
+
     // If this is the last chunk, assemble the file
     if (chunkIndexNum === totalChunksNum - 1) {
-      const chunksDir = path.join(tempDir, 'chunks');
       const userDir = getUserDir(username);
       const targetDir = path.join(userDir, subPath || '');
       fs.mkdirSync(targetDir, { recursive: true });
@@ -710,10 +715,10 @@ app.post("/api/upload-chunk", authenticate, chunkUpload.single("chunk"), async (
 
       // Reassemble chunks in order
       for (let i = 0; i < totalChunksNum; i++) {
-        const chunkPath = path.join(chunksDir, `${uploadId}-chunk-${i}`);
-        const chunkData = fs.readFileSync(chunkPath);
+        const currentChunkPath = path.join(chunksDir, `${uploadId}-chunk-${i}`);
+        const chunkData = fs.readFileSync(currentChunkPath);
         writeStream.write(chunkData);
-        fs.unlinkSync(chunkPath); // Clean up chunk
+        fs.unlinkSync(currentChunkPath); // Clean up chunk
       }
 
       writeStream.end();
