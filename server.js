@@ -838,111 +838,58 @@ app.get("/api/apikey", (req, res) => {
   res.json({ apiKey: acc.apiKey });
 });
 
-// Package API - creates a ZIP of multiple files with transformations
+// Simple file processing endpoint - take username, path, and optional params, return processed file
 app.post("/api/package", async (req, res) => {
   try {
-    const { username, files } = req.body;
+    const { username, path: filePath, ...params } = req.body;
 
-    if (!username) {
-      return res.status(400).json({ error: "username required" });
+    if (!username || !filePath) {
+      return res.status(400).json({ error: "username and path required" });
     }
 
-    if (!files || !Array.isArray(files) || files.length === 0) {
-      return res.status(400).json({ error: "files array required" });
+    const fullPath = resolveUserPath(username, filePath);
+
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).json({ error: "File not found" });
     }
 
-    // Generate unique package ID
-    const packageId = crypto.randomBytes(8).toString('hex');
-    const zipPath = path.join(tempDir, `package_${packageId}.zip`);
+    let processedPath = fullPath;
 
-    // Create zip archive
-    const output = fs.createWriteStream(zipPath);
-    const archive = archiver('zip', { zlib: { level: 9 } });
-
-    archive.pipe(output);
-
-    // Process each file
-    for (const file of files) {
-      const { path: filePath, ...params } = file;
+    // Process image files
+    if (isImageFile(fullPath) && Object.keys(params).length > 0) {
+      const cacheKey = getCacheKey(fullPath, params);
+      const cachedFiles = fs.readdirSync(tempDir).filter(f => f.startsWith(cacheKey));
       
-      if (!filePath) continue;
-
-      try {
-        const fullPath = resolveUserPath(username, filePath);
-
-        // Check if file exists
-        if (!fs.existsSync(fullPath)) {
-          console.warn(`[package] File not found: ${filePath}`);
-          continue;
-        }
-
-        let processedPath = fullPath;
-        const fileName = path.basename(filePath);
-
-        // Process image files
-        if (isImageFile(fullPath) && Object.keys(params).length > 0) {
-          const cacheKey = getCacheKey(fullPath, params);
-          const cachedFiles = fs.readdirSync(tempDir).filter(f => f.startsWith(cacheKey));
-          
-          if (cachedFiles.length > 0) {
-            processedPath = path.join(tempDir, cachedFiles[0]);
-          } else {
-            processedPath = await processImage(fullPath, params, tempDir);
-          }
-        }
-        // Process audio files
-        else if (isAudioFile(fullPath) && Object.keys(params).length > 0) {
-          const cacheKey = getCacheKey(fullPath, params);
-          const cachedFiles = fs.readdirSync(tempDir).filter(f => f.startsWith(cacheKey));
-          
-          if (cachedFiles.length > 0) {
-            processedPath = path.join(tempDir, cachedFiles[0]);
-          } else {
-            processedPath = await processAudio(fullPath, params, tempDir);
-          }
-        }
-        // Process video files
-        else if (isVideoFile(fullPath) && Object.keys(params).length > 0) {
-          const cacheKey = getCacheKey(fullPath, params);
-          const cachedFiles = fs.readdirSync(tempDir).filter(f => f.startsWith(cacheKey));
-          
-          if (cachedFiles.length > 0) {
-            processedPath = path.join(tempDir, cachedFiles[0]);
-          } else {
-            processedPath = await processVideo(fullPath, params, tempDir);
-          }
-        }
-
-        // Add file to zip with transformed name if format changed
-        let archiveName = fileName;
-        if (params.f) {
-          const ext = params.f.toLowerCase();
-          archiveName = path.parse(fileName).name + '.' + ext;
-        }
-
-        archive.file(processedPath, { name: archiveName });
-        console.log(`[package] Added to zip: ${archiveName}`);
-      } catch (err) {
-        console.error(`[package] Error processing ${filePath}:`, err.message);
+      if (cachedFiles.length > 0) {
+        processedPath = path.join(tempDir, cachedFiles[0]);
+      } else {
+        processedPath = await processImage(fullPath, params, tempDir);
+      }
+    }
+    // Process audio files
+    else if (isAudioFile(fullPath) && Object.keys(params).length > 0) {
+      const cacheKey = getCacheKey(fullPath, params);
+      const cachedFiles = fs.readdirSync(tempDir).filter(f => f.startsWith(cacheKey));
+      
+      if (cachedFiles.length > 0) {
+        processedPath = path.join(tempDir, cachedFiles[0]);
+      } else {
+        processedPath = await processAudio(fullPath, params, tempDir);
+      }
+    }
+    // Process video files
+    else if (isVideoFile(fullPath) && Object.keys(params).length > 0) {
+      const cacheKey = getCacheKey(fullPath, params);
+      const cachedFiles = fs.readdirSync(tempDir).filter(f => f.startsWith(cacheKey));
+      
+      if (cachedFiles.length > 0) {
+        processedPath = path.join(tempDir, cachedFiles[0]);
+      } else {
+        processedPath = await processVideo(fullPath, params, tempDir);
       }
     }
 
-    // Finalize archive
-    archive.on('error', (err) => {
-      console.error('[package] Archive error:', err);
-      res.status(500).json({ error: 'Failed to create package' });
-    });
-
-    output.on('finish', () => {
-      const fileSize = fs.statSync(zipPath).size;
-      console.log(`[package] Created package ${packageId} (${fileSize} bytes)`);
-      
-      res.download(zipPath, `package_${packageId}.zip`, (err) => {
-        if (err) console.error('[package] Download error:', err);
-      });
-    });
-
-    archive.finalize();
+    res.sendFile(processedPath);
   } catch (err) {
     console.error('[package] Error:', err);
     res.status(500).json({ error: err.message });
