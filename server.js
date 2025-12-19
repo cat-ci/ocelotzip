@@ -29,6 +29,17 @@ if (!fs.existsSync(accountsDir)) fs.mkdirSync(accountsDir);
 const tempDir = path.join(process.cwd(), "temp");
 if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
 
+// Enable CORS for all origins
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-CATCI-Secret, X-CATCI-Username, X-CATCI-Path");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+  next();
+});
+
 app.use(express.static("public"));
 app.use(express.json());
 app.use(
