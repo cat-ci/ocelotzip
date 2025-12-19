@@ -675,6 +675,91 @@ app.post("/api/upload-multi", authenticate, upload.array("files"), (req, res) =>
   }
 });
 
+// Chunked upload endpoint for large files (bypasses Cloudflare 100MB limit)
+const chunkStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const chunksDir = path.join(tempDir, 'chunks');
+    fs.mkdirSync(chunksDir, { recursive: true });
+    cb(null, chunksDir);
+  },
+  filename: (req, file, cb) => {
+    const { uploadId, chunkIndex } = req.body;
+    cb(null, `${uploadId}-chunk-${chunkIndex}`);
+  }
+});
+const chunkUpload = multer({ storage: chunkStorage });
+
+app.post("/api/upload-chunk", authenticate, chunkUpload.single("chunk"), async (req, res) => {
+  try {
+    const username = req.authUser;
+    const { uploadId, chunkIndex, totalChunks, filename, path: subPath } = req.body;
+    
+    const chunkIndexNum = parseInt(chunkIndex);
+    const totalChunksNum = parseInt(totalChunks);
+
+    // If this is the last chunk, assemble the file
+    if (chunkIndexNum === totalChunksNum - 1) {
+      const chunksDir = path.join(tempDir, 'chunks');
+      const userDir = getUserDir(username);
+      const targetDir = path.join(userDir, subPath || '');
+      fs.mkdirSync(targetDir, { recursive: true });
+      
+      const finalFilename = Date.now() + "-" + safeName(filename);
+      const finalPath = path.join(targetDir, finalFilename);
+      const writeStream = fs.createWriteStream(finalPath);
+
+      // Reassemble chunks in order
+      for (let i = 0; i < totalChunksNum; i++) {
+        const chunkPath = path.join(chunksDir, `${uploadId}-chunk-${i}`);
+        const chunkData = fs.readFileSync(chunkPath);
+        writeStream.write(chunkData);
+        fs.unlinkSync(chunkPath); // Clean up chunk
+      }
+
+      writeStream.end();
+
+      // Wait for write to finish
+      await new Promise((resolve, reject) => {
+        writeStream.on('finish', resolve);
+        writeStream.on('error', reject);
+      });
+
+      // Check storage quota
+      const acc = getOrCreateAccount(username, "");
+      const usedBytes = getUsedStorageBytes(username);
+      
+      if (usedBytes > acc.maxBytes) {
+        fs.unlinkSync(finalPath);
+        return res.status(400).json({ error: "Storage quota exceeded" });
+      }
+
+      // Update account storage
+      acc.usedBytes = usedBytes;
+      fs.writeFileSync(getAccountFile(username), JSON.stringify(acc, null, 2));
+
+      // Add to slug map
+      const slugMap = getSlugMap(username);
+      const slug = generateSlug();
+      const originalName = path.parse(filename).name;
+      const relPath = path.join(subPath || "", finalFilename);
+      
+      slugMap[slug] = {
+        timestamp: relPath,
+        original: originalName,
+        created: new Date().toISOString()
+      };
+      saveSlugMap(username, slugMap);
+
+      res.json({ success: true, slug, filename: finalFilename });
+    } else {
+      // Not the last chunk, just acknowledge receipt
+      res.json({ success: true, chunkIndex: chunkIndexNum });
+    }
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // CATCI service authentication middleware
 function catciAuth(req, res, next) {
   const expected = process.env.CATCI_SECRET || process.env.CATCI_SERVICE_SECRET;

@@ -998,7 +998,7 @@
             e.target.value = '';
         });
 
-        function uploadFilesWithProgress(files) {
+        async function uploadFilesWithProgress(files) {
             const container = document.getElementById('uploadProgressContainer');
             const fill = document.getElementById('uploadProgressFill');
             const text = document.getElementById('uploadProgressText');
@@ -1011,49 +1011,82 @@
             uploadBtn.setAttribute('aria-disabled', 'true');
             uploadBtn.style.pointerEvents = 'none';
 
-            const xhr = new XMLHttpRequest();
-            const form = new FormData();
-            files.forEach(f => form.append('files', f));
+            const CHUNK_SIZE = 95 * 1024 * 1024; // 95MB chunks to be safe under Cloudflare's 100MB limit
 
-            xhr.upload.addEventListener('progress', (ev) => {
-                if (ev.lengthComputable) {
-                    const pct = Math.round((ev.loaded / ev.total) * 100);
-                    fill.style.width = pct + '%';
-                    text.textContent = pct + '%';
-                }
-            });
+            try {
+                let totalUploaded = 0;
+                const totalSize = files.reduce((sum, f) => sum + f.size, 0);
 
-            xhr.addEventListener('load', () => {
-                uploadBtn.removeAttribute('aria-disabled');
-                uploadBtn.style.pointerEvents = '';
-                container.style.display = 'none';
-                container.setAttribute('aria-hidden', 'true');
+                for (const file of files) {
+                    if (file.size <= CHUNK_SIZE) {
+                        // Small file: upload normally
+                        const form = new FormData();
+                        form.append('files', file);
+                        
+                        const res = await fetch('/api/upload-multi?path=' + encodeURIComponent(currentPath), {
+                            method: 'POST',
+                            body: form
+                        });
 
-                if (xhr.status >= 200 && xhr.status < 300) {
-                    try {
-                        const data = JSON.parse(xhr.responseText || '{}');
-                        updateStatus(`Uploaded ${files.length} file${files.length === 1 ? '' : 's'}`);
-                    } catch (err) {
-                        updateStatus('Upload completed');
+                        if (!res.ok) {
+                            const err = await res.json();
+                            throw new Error(err.error || 'Upload failed');
+                        }
+
+                        totalUploaded += file.size;
+                        const pct = Math.round((totalUploaded / totalSize) * 100);
+                        fill.style.width = pct + '%';
+                        text.textContent = pct + '%';
+                    } else {
+                        // Large file: upload in chunks
+                        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+                        const uploadId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+
+                        for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+                            const start = chunkIndex * CHUNK_SIZE;
+                            const end = Math.min(start + CHUNK_SIZE, file.size);
+                            const chunk = file.slice(start, end);
+
+                            const form = new FormData();
+                            form.append('chunk', chunk);
+                            form.append('uploadId', uploadId);
+                            form.append('chunkIndex', chunkIndex);
+                            form.append('totalChunks', totalChunks);
+                            form.append('filename', file.name);
+                            form.append('path', currentPath);
+
+                            const res = await fetch('/api/upload-chunk', {
+                                method: 'POST',
+                                body: form
+                            });
+
+                            if (!res.ok) {
+                                const err = await res.json();
+                                throw new Error(err.error || 'Chunk upload failed');
+                            }
+
+                            totalUploaded += (end - start);
+                            const pct = Math.round((totalUploaded / totalSize) * 100);
+                            fill.style.width = pct + '%';
+                            text.textContent = pct + '%';
+                        }
                     }
-                    fetchFiles();
-                } else {
-                    let msg = 'Upload failed';
-                    try { msg = JSON.parse(xhr.responseText).error || msg; } catch (e) {}
-                    alert(msg + ` (status ${xhr.status})`);
                 }
-            });
 
-            xhr.addEventListener('error', () => {
                 uploadBtn.removeAttribute('aria-disabled');
                 uploadBtn.style.pointerEvents = '';
                 container.style.display = 'none';
                 container.setAttribute('aria-hidden', 'true');
-                alert('Upload failed due to a network error.');
-            });
+                updateStatus(`Uploaded ${files.length} file${files.length === 1 ? '' : 's'}`);
+                fetchFiles();
 
-            xhr.open('POST', '/api/upload-multi?path=' + encodeURIComponent(currentPath));
-            xhr.send(form);
+            } catch (error) {
+                uploadBtn.removeAttribute('aria-disabled');
+                uploadBtn.style.pointerEvents = '';
+                container.style.display = 'none';
+                container.setAttribute('aria-hidden', 'true');
+                alert('Upload failed: ' + error.message);
+            }
         }
 
         document.getElementById('uploadBtn')?.addEventListener('click', (e) => {
