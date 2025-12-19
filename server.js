@@ -356,6 +356,86 @@ app.get("/logout", async (req, res) => {
   req.session.destroy(() => res.redirect("/"));
 });
 
+// Public file listing endpoint (unauthenticated, requires username in query)
+app.get("/api/files-public", (req, res) => {
+  const username = req.query.username;
+  const subPath = req.query.path || "";
+  
+  if (!username) {
+    return res.status(400).json({ error: "username required" });
+  }
+  
+  try {
+    const targetDir = resolveUserPath(username, subPath);
+    fs.mkdirSync(targetDir, { recursive: true });
+    let slugMap = getSlugMap(username);
+    
+    const items = fs.readdirSync(targetDir).map((name) => {
+      const full = path.join(targetDir, name);
+      const stat = fs.statSync(full);
+      const rel = path.relative(getUserDir(username), full);
+      
+      let slug = null;
+      let originalName = path.parse(name).name;
+      
+      if (!stat.isDirectory()) {
+        for (const [s, mapping] of Object.entries(slugMap)) {
+          const mapped = mapping.timestamp;
+          if (
+            mapped === rel ||
+            path.basename(mapped) === name ||
+            mapped.endsWith(path.sep + name) ||
+            mapped.endsWith('/' + name)
+          ) {
+            slug = s;
+            originalName = mapping.original;
+            break;
+          }
+        }
+        
+        if (!slug) {
+          slug = generateSlug();
+          const match = name.match(/^\d+-(.+)$/);
+          const extracted = match ? match[1] : originalName;
+          const nameOnly = path.parse(extracted).name;
+          const relPath = rel;
+          slugMap[slug] = {
+            timestamp: relPath,
+            original: nameOnly,
+            created: new Date().toISOString()
+          };
+          saveSlugMap(username, slugMap);
+          originalName = nameOnly;
+        }
+      }
+      
+      return {
+        name,
+        originalName,
+        slug,
+        isDir: stat.isDirectory(),
+        size: stat.isFile() ? stat.size : 0,
+        mtime: stat.mtime,
+        path: rel,
+        url: stat.isFile()
+          ? `/files/${encodeURIComponent(username)}/${rel
+              .split(path.sep)
+              .map(encodeURIComponent)
+              .join("/")}`
+          : null,
+      };
+    });
+    
+    res.json({
+      username,
+      path: subPath,
+      items,
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.get("/api/files", authenticate, (req, res) => {
   const username = req.authUser;
   const subPath = req.query.path || "";
