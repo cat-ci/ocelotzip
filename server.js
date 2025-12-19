@@ -94,7 +94,7 @@ function getUsedStorageBytes(username) {
   return total;
 }
 function getOrCreateAccount(username, email) {
-  const file = getAccountFile(username);d
+  const file = getAccountFile(username);
   if (!fs.existsSync(file)) {
     const apiKey = crypto.randomBytes(24).toString("hex");
     const acc = {
