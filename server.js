@@ -41,7 +41,7 @@ app.use((req, res, next) => {
 });
 
 app.use(express.static("public"));
-app.use(express.json({ limit: '50mb' })); // Increase JSON body limit
+app.use(express.json({ limit: '500 mb' })); // Increase JSON body limit
 app.use(
   session({
     secret: process.env.SESSION_SECRET || "change-this-session-secret",
