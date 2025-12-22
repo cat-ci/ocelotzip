@@ -1,0 +1,19 @@
+[
+    {
+        "username": "example_user",
+        "files": {
+            // lets say example_user has upload two files they are uploaded for them under /images/bush.avif and /images/metal.avif these translate to /files/<username>/images/<timestamped>.avif and /files/<username>/images/<timestamped>.avif
+            // strictly grab the path from theyre uploads folder and just compress the two files into a zip
+            "file": {
+                "path": "/images/bush.avif",
+                "format": "png",
+                "w": 800
+            },
+            "file": {
+                "path": "/images/metal.avif",
+                "format": "jpeg",
+                "s": 50
+            }
+        }
+    }
+]

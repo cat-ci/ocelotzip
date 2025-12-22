@@ -936,55 +936,115 @@ app.get("/api/apikey", (req, res) => {
 // Simple file processing endpoint - take username, path, and optional params, return processed file
 app.post("/api/package", async (req, res) => {
   try {
-    const { username, path: filePath, ...params } = req.body;
-
-    if (!username || !filePath) {
-      return res.status(400).json({ error: "username and path required" });
+    const requests = Array.isArray(req.body) ? req.body : [req.body];
+    
+    if (requests.length === 0) {
+      return res.status(400).json({ error: "At least one request required" });
     }
 
-    const fullPath = resolveUserPath(username, filePath);
-
-    if (!fs.existsSync(fullPath)) {
-      return res.status(404).json({ error: "File not found" });
-    }
-
-    let processedPath = fullPath;
-
-    // Process image files
-    if (isImageFile(fullPath) && Object.keys(params).length > 0) {
-      const cacheKey = getCacheKey(fullPath, params);
-      const cachedFiles = fs.readdirSync(tempDir).filter(f => f.startsWith(cacheKey));
-      
-      if (cachedFiles.length > 0) {
-        processedPath = path.join(tempDir, cachedFiles[0]);
-      } else {
-        processedPath = await processImage(fullPath, params, tempDir);
+    // Validate all requests first
+    for (const request of requests) {
+      if (!request.username) {
+        return res.status(400).json({ error: "username is required for all requests" });
       }
-    }
-    // Process audio files
-    else if (isAudioFile(fullPath) && Object.keys(params).length > 0) {
-      const cacheKey = getCacheKey(fullPath, params);
-      const cachedFiles = fs.readdirSync(tempDir).filter(f => f.startsWith(cacheKey));
-      
-      if (cachedFiles.length > 0) {
-        processedPath = path.join(tempDir, cachedFiles[0]);
-      } else {
-        processedPath = await processAudio(fullPath, params, tempDir);
-      }
-    }
-    // Process video files
-    else if (isVideoFile(fullPath) && Object.keys(params).length > 0) {
-      const cacheKey = getCacheKey(fullPath, params);
-      const cachedFiles = fs.readdirSync(tempDir).filter(f => f.startsWith(cacheKey));
-      
-      if (cachedFiles.length > 0) {
-        processedPath = path.join(tempDir, cachedFiles[0]);
-      } else {
-        processedPath = await processVideo(fullPath, params, tempDir);
+      if (!request.files || typeof request.files !== 'object') {
+        return res.status(400).json({ error: "files object is required" });
       }
     }
 
-    res.sendFile(processedPath);
+    // Create a unique zip name
+    const zipName = `package-${Date.now()}.zip`;
+    const zipPath = path.join(tempDir, zipName);
+    const output = fs.createWriteStream(zipPath);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+
+    // Handle stream events
+    output.on('close', () => {
+      console.log(`[package] Zip created: ${archive.pointer()} bytes`);
+    });
+
+    archive.on('error', (err) => {
+      throw err;
+    });
+
+    archive.pipe(output);
+
+    // Process each request
+    for (const request of requests) {
+      const username = request.username;
+      const files = request.files;
+
+      // Process each file in the request
+      for (const fileKey in files) {
+        const fileConfig = files[fileKey];
+        
+        if (!fileConfig.path) {
+          console.warn(`[package] Skipping file without path in request for ${username}`);
+          continue;
+        }
+
+        // Resolve the file path from the user's uploads folder
+        const fullPath = resolveUserPath(username, fileConfig.path);
+
+        if (!fs.existsSync(fullPath)) {
+          console.warn(`[package] File not found: ${fullPath}`);
+          continue;
+        }
+
+        let processedPath = fullPath;
+        const { path: filePath, ...params } = fileConfig;
+
+        // Process the file based on its type and parameters
+        if (Object.keys(params).length > 0) {
+          const cacheKey = getCacheKey(fullPath, params);
+          const cachedFiles = fs.readdirSync(tempDir).filter(f => f.startsWith(cacheKey));
+
+          if (cachedFiles.length > 0) {
+            // Use cached version
+            processedPath = path.join(tempDir, cachedFiles[0]);
+            console.log(`[package] Using cached file: ${cachedFiles[0]}`);
+          } else {
+            // Process based on file type
+            if (isImageFile(fullPath)) {
+              processedPath = await processImage(fullPath, params, tempDir);
+            } else if (isAudioFile(fullPath)) {
+              processedPath = await processAudio(fullPath, params, tempDir);
+            } else if (isVideoFile(fullPath)) {
+              processedPath = await processVideo(fullPath, params, tempDir);
+            }
+          }
+        }
+
+        // Add processed file to zip with a sensible name
+        const fileName = path.basename(processedPath);
+        archive.file(processedPath, { name: fileName });
+        console.log(`[package] Added to zip: ${fileName}`);
+      }
+    }
+
+    // Finalize the archive
+    await archive.finalize();
+
+    // Wait for the output stream to finish
+    await new Promise((resolve, reject) => {
+      output.on('close', resolve);
+      output.on('error', reject);
+    });
+
+    // Send the zip file
+    res.download(zipPath, zipName, (err) => {
+      // Clean up the zip file after sending
+      try {
+        fs.unlinkSync(zipPath);
+      } catch (cleanupErr) {
+        console.error('[package] Cleanup error:', cleanupErr);
+      }
+      
+      if (err) {
+        console.error('[package] Download error:', err);
+      }
+    });
+
   } catch (err) {
     console.error('[package] Error:', err);
     res.status(500).json({ error: err.message });
